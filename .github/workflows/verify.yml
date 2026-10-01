@@ -1,11 +1,15 @@
 name: Verify
 on:
   pull_request:
-    branches: [develop, main]
+    # Run CI on every PR regardless of its base branch, so stacked PRs
+    # (e.g. docs/** or refactor/** targeting another feature branch) are verified too.
   push:
-    branches: [develop, main, 'feature/**', 'fix/**', 'chore/**']
+    branches: [develop, main, 'feature/**', 'fix/**', 'chore/**', 'docs/**', 'refactor/**']
 permissions:
   contents: read
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   verify:
     runs-on: ubuntu-latest
