@@ -103,3 +103,44 @@ Result: `pnpm test` PASS, `pnpm run typecheck` PASS, `pnpm run lint` PASS (0 err
 page title, data id, schema, storage, Arabic RTL/Tajawal, draft-vs-published
 separation, result↔form version binding, server-side tester identity/permissions,
 or evidence integrity changed. No DB migration, no production data touched.
+
+## 2026-10-01 — Extract pure domain into lib/domain (Issue #4, refactor)
+
+`app/` mixed framework routes with pure domain models and UI components, coupling
+domain rules to the framework directory and hiding where things belong. This
+change moves the pure domain layer out of `app/` so `app/` keeps only what the
+app-router convention requires.
+
+Moved (git mv, preserving history):
+- `app/model.ts`, `admin-model.ts`, `editor-model.ts`, `advanced-model.ts`,
+  `navigation-model.ts`, `form-export.ts` → `lib/domain/`.
+- `app/data/plan.json` → `lib/domain/data/plan.json` (keeps `model.ts`'s relative
+  `./data/plan.json` import valid).
+
+Internal imports between the domain modules are relative and co-located, so they
+are unchanged. External importers updated:
+- `app/*.tsx` (depth 1): `./<domain>` → `../lib/domain/<domain>`.
+- `app/api/auth.ts` (depth 2): `../<domain>` → `../../lib/domain/<domain>`.
+- `app/api/*/route.ts` (depth 3): `../../<domain>` → `../../../lib/domain/<domain>`.
+- `app/api/*/*/route.ts` (depth 4): `../../../<domain>` → `../../../../lib/domain/<domain>`.
+- The inline `import('../../editor-model').TestForm` in results/route.ts and the
+  double-quoted `"./form-export"` imports in three tsx files were updated too.
+- `tests/model.mjs` and `tests/enhancements.mjs` updated: file list, the
+  `if(file===...)` model path, `plan.json` reads, and the `load('app/<domain>.ts')`
+  dynamic-import paths.
+
+Architecture-contract test (`tests/architecture.mjs`) extended to assert the new
+boundary is binding: the six domain files exist in `lib/domain/`, do NOT exist in
+`app/`, `lib/domain/model.ts` imports neither `react` nor `cloudflare:workers`,
+and `app/api/auth.ts` imports domain from `lib/domain/`.
+
+Result: `pnpm test` PASS (incl. new domain-location assertions), `pnpm run
+typecheck` PASS, `pnpm run lint` PASS (0/0), `pnpm run build` PASS, `git diff
+--check` clean. Behavior-preserving: no API contract, page title, data id,
+schema, storage, Arabic RTL/Tajawal, draft/published separation, result↔form
+version binding, server-side tester identity/permissions, or evidence integrity
+changed. Filenames are intentionally preserved to keep the move minimal and
+reviewable; a clearer-naming follow-up is documented in ADR 0003.
+
+Stacked on docs/architecture-and-methodology (PR #6), which is stacked on
+fix/4-lint-blocker (PR #5).

@@ -1,6 +1,6 @@
 import {db,checkOrigin,unavailable,checked,ApiError} from '../storage';
 import {authorize,ownerEmail,ownerProfile,userRow,conflict} from '../auth';
-import {validateUser} from '../../admin-model';
+import {validateUser} from '../../../lib/domain/admin-model';
 import type {AppUserRow,EmailRow} from '../types';
 export async function GET(request:Request){try{await authorize(request,'manageUsers');const owner=await db().prepare("SELECT name FROM site_owner WHERE id='owner'").first<{name:string}>();const rows=await db().prepare('SELECT * FROM app_users ORDER BY name').all<AppUserRow>();return Response.json({users:[ownerProfile(ownerEmail(),owner?.name||ownerEmail()),...rows.results.map(userRow)]},{headers:{'Cache-Control':'private, no-store'}});}catch(e){return unavailable(e);}}
 export async function PUT(request:Request){const rejected=checkOrigin(request);if(rejected)return rejected;try{await authorize(request,'manageUsers');const body=await request.json();const value=checked(()=>validateUser(body,ownerEmail()));const now=new Date().toISOString();

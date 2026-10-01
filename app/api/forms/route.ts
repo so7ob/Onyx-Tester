@@ -1,7 +1,7 @@
 import {db,checkOrigin,unavailable,checked,ApiError} from '../storage';
 import {authorize,getForm,conflict} from '../auth';
-import {validateForm} from '../../admin-model';
-import {plan} from '../../model';
+import {validateForm} from '../../../lib/domain/admin-model';
+import {plan} from '../../../lib/domain/model';
 import type {ScreenFormRow} from '../types';
 export async function PUT(request:Request){const rejected=checkOrigin(request);if(rejected)return rejected;try{await authorize(request,'design');const body=await request.json();const value=checked(()=>validateForm(body));const screen=plan.screens.find(s=>s.id===value.screenId)!;await authorize(request,'design',screen.system);
  const old=await getForm(screen.id);

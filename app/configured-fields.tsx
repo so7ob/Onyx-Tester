@@ -3,10 +3,10 @@ import {useState,type ReactNode,type CSSProperties} from 'react';
 import {Input} from '@/components/ui/input';
 import {Textarea} from '@/components/ui/textarea';
 import {Button} from '@/components/ui/button';
-import {states} from './model';
-import type {FieldValue,Values} from './admin-model';
-import type {FormField,FormGroup,TestForm} from './editor-model';
-import {computedValues,effectiveField} from './advanced-model';
+import {states} from '../lib/domain/model';
+import type {FieldValue,Values} from '../lib/domain/admin-model';
+import type {FormField,FormGroup,TestForm} from '../lib/domain/editor-model';
+import {computedValues,effectiveField} from '../lib/domain/advanced-model';
 import {Choice,Tick,newFieldId} from './form-fields';
 type Row={id:string;cells:Record<string,FieldValue>};
 function EditableTable({field:f,value,onChange,disabled}:{field:FormField;value:FieldValue;onChange:(v:FieldValue)=>void;disabled:boolean}){

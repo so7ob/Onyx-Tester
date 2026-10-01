@@ -1,8 +1,8 @@
 import {readFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
 import ts from 'typescript';
-const raw=JSON.parse(readFileSync('app/data/plan.json','utf8'));
-const source=readFileSync('app/model.ts','utf8').replace("import raw from './data/plan.json';",'const raw='+JSON.stringify(raw)+';');
+const raw=JSON.parse(readFileSync('lib/domain/data/plan.json','utf8'));
+const source=readFileSync('lib/domain/model.ts','utf8').replace("import raw from './data/plan.json';",'const raw='+JSON.stringify(raw)+';');
 const js=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText;
 const m=await import('data:text/javascript;base64,'+Buffer.from(js).toString('base64'));
 assert.equal(raw.systems.length,18);assert.equal(raw.tests.length,245);assert.equal(raw.screens.length,180);assert.equal(raw.pending.length,3);

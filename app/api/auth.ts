@@ -1,7 +1,7 @@
 import {env} from 'cloudflare:workers';
-import {plan,testMap} from '../model';
-import {can,rolePermissions,type AppUser,type Permission,type Role,type ScreenForm} from '../admin-model';
-import {resolveTestForm,type TestForm} from '../editor-model';
+import {plan,testMap} from '../../lib/domain/model';
+import {can,rolePermissions,type AppUser,type Permission,type Role,type ScreenForm} from '../../lib/domain/admin-model';
+import {resolveTestForm,type TestForm} from '../../lib/domain/editor-model';
 import {ApiError,db} from './storage';
 import type {AppUserRow,ScreenFormRow,TestFormRow} from './types';
 export function ownerEmail(){return env.ONYX_OWNER_EMAIL?.trim().toLowerCase()||(__ONYX_LOCAL_PREVIEW__?'preview-owner@sites.test':'');}

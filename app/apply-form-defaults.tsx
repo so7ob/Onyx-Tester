@@ -3,8 +3,8 @@ import {useState} from 'react';
 import {Button} from '@/components/ui/button';
 import {Dialog,DialogContent,DialogHeader,DialogTitle,DialogDescription,DialogFooter} from '@/components/ui/dialog';
 import {Table,TableHeader,TableBody,TableRow,TableHead,TableCell} from '@/components/ui/table';
-import type {FieldValue} from './admin-model';
-import {defaultChanges,type DefaultChange,type TestForm} from './editor-model';
+import type {FieldValue} from '../lib/domain/admin-model';
+import {defaultChanges,type DefaultChange,type TestForm} from '../lib/domain/editor-model';
 const display=(v:FieldValue|undefined)=>v===undefined||v===''?'فارغ':typeof v==='boolean'?v?'نعم':'لا':v;
 export function FormVersion({form}:{form:TestForm}){return <p className="form-version">{form.version?'إصدار النموذج '+form.version:form.origin==='screen'?'إعدادات الشاشة السابقة':'النموذج الأساسي'}{form.updatedAt?' · '+new Date(form.updatedAt).toLocaleString('ar-YE',{timeZone:'Asia/Aden'}):''}</p>;}
 export function ApplyFormDefaults({form,group,values,onApply,disabled}:{form:TestForm;group:'execution'|'preparation';values:Record<string,FieldValue>;onApply:(changes:DefaultChange[])=>void;disabled:boolean}){

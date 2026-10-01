@@ -1,5 +1,5 @@
 import {db,bucket,checkOrigin,unavailable,ApiError} from '../storage';
-import {testMap} from '../../model';
+import {testMap} from '../../../lib/domain/model';
 import {authorize,testSystem} from '../auth';
 export async function POST(request:Request){const rejected=checkOrigin(request);if(rejected)return rejected;
  try{await authorize(request,'execute');const form=await request.formData();const testId=String(form.get('testId')??'');const file=form.get('file');await authorize(request,'execute',testSystem(testId));

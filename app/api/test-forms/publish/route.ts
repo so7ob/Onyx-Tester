@@ -1,6 +1,6 @@
 import {authorize,testSystem,getTestForm,conflict} from '../../auth';
 import {db,checkOrigin,unavailable,ApiError,checked} from '../../storage';
-import {validateTestForm} from '../../../editor-model';
+import {validateTestForm} from '../../../../lib/domain/editor-model';
 export async function POST(request:Request){const rejected=checkOrigin(request);if(rejected)return rejected;try{
  const body=await request.json() as {testId:string;version:number};const actor=await authorize(request,'publish',testSystem(body.testId));
  const current=await getTestForm(body.testId);if(!current.version)throw new ApiError('احفظ مسودة النموذج أولاً.');if(current.version!==body.version)conflict();checked(()=>validateTestForm(current));
