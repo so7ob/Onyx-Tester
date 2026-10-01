@@ -1,12 +1,12 @@
 "use client";
-import {downloadForm} from "./form-export";
+import {downloadForm} from "../lib/domain/form-export";
 import {useEffect,useState} from 'react';
 import {Database,Save,CheckCheck,Play,SlidersHorizontal} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {toast} from 'sonner';
-import {plan,type Screen,type TestCase} from './model';
-import type {TestData,FieldValue} from './admin-model';
-import {hydrateData,applyDefaultChanges,dataValues,validateConfiguredData,preparationIssue,type FormField,type TestForm} from './editor-model';
+import {plan,type Screen,type TestCase} from '../lib/domain/model';
+import type {TestData,FieldValue} from '../lib/domain/admin-model';
+import {hydrateData,applyDefaultChanges,dataValues,validateConfiguredData,preparationIssue,type FormField,type TestForm} from '../lib/domain/editor-model';
 import {Choice} from './form-fields';
 import {Input} from '@/components/ui/input';
 import {ApplyFormDefaults,FormVersion} from './apply-form-defaults';

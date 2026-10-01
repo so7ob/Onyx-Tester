@@ -5,8 +5,8 @@ import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {Table,TableHeader,TableBody,TableRow,TableHead,TableCell} from '@/components/ui/table';
 import {toast} from 'sonner';
-import {plan} from './model';
-import {roleLabels,rolePermissions,permissionLabels,type AppUser,type Role,type Permission} from './admin-model';
+import {plan} from '../lib/domain/model';
+import {roleLabels,rolePermissions,permissionLabels,type AppUser,type Role,type Permission} from '../lib/domain/admin-model';
 import {Choice,Tick,readResponse,put} from './form-fields';
 export function UserManager({onDirty,navigate}:{onDirty:(v:boolean)=>void;navigate:(action:()=>void)=>void}){
  const [users,setUsers]=useState<AppUser[]>([]),[value,setValue]=useState<AppUser|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[query,setQuery]=useState('');

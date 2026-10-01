@@ -1,8 +1,8 @@
 import {authorize,testSystem,getPublishedForm,conflict} from '../../auth';
 import {db,checkOrigin,unavailable,ApiError} from '../../storage';
-import type {TestData} from '../../../admin-model';
-import {testMap} from '../../../model';
-import {initialResult,validateConfiguredResult} from '../../../editor-model';
+import type {TestData} from '../../../../lib/domain/admin-model';
+import {testMap} from '../../../../lib/domain/model';
+import {initialResult,validateConfiguredResult} from '../../../../lib/domain/editor-model';
 import {select,resultRow} from '../route';
 import type {ResultRow} from '../../types';
 export async function GET(request:Request){try{const id=new URL(request.url).searchParams.get('testId')??'';await authorize(request,'view',testSystem(id));const rows=await db().prepare('SELECT id,snapshot,evidence,created_at AS createdAt FROM result_history WHERE test_id=? ORDER BY created_at DESC LIMIT 100').bind(id).all<{id:string;snapshot:string;evidence:string;createdAt:string}>();return Response.json({history:rows.results.map(r=>({...r,snapshot:JSON.parse(r.snapshot),evidence:JSON.parse(r.evidence)}))},{headers:{'Cache-Control':'private, no-store'}});}catch(e){return unavailable(e);}}
