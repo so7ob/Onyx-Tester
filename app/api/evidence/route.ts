@@ -1,6 +1,7 @@
-import {db,bucket,checkOrigin,unavailable,ApiError} from '../storage';
+import {db,bucket} from '../../../lib/server/db';
+import {checkOrigin,unavailable,ApiError} from '../../../lib/server/errors';
 import {testMap} from '../../../lib/domain/model';
-import {authorize,testSystem} from '../auth';
+import {authorize,testSystem} from '../../../lib/server/auth';
 export async function POST(request:Request){const rejected=checkOrigin(request);if(rejected)return rejected;
  try{await authorize(request,'execute');const form=await request.formData();const testId=String(form.get('testId')??'');const file=form.get('file');await authorize(request,'execute',testSystem(testId));
  if(!testMap.has(testId)||!(file instanceof File)||!file.size||file.size>10*1024*1024)return Response.json({error:'اختر ملفاً غير فارغ لا يتجاوز 10 ميجابايت لاختبار موثق.'},{status:400});
