@@ -7,4 +7,14 @@ const pkg=JSON.parse(readFileSync('package.json','utf8')); assert.equal(pkg.pack
 assert.ok(readdirSync('drizzle').includes('0005_flaky_raza.sql'));
 const auth=readFileSync('app/api/auth.ts','utf8'); assert.ok(auth.includes('ONYX_OWNER_EMAIL'));
 const workflow=readFileSync('.github/workflows/verify.yml','utf8'); for(const s of ['pnpm test','pnpm run lint','pnpm run typecheck','pnpm run build']) assert.ok(workflow.includes(s));
-assert.ok(!workflow.includes('deploy')); console.log('Architecture contracts passed');
+assert.ok(!workflow.includes('deploy'));
+// Methodology and architecture documentation are present and binding.
+const architecture=readFileSync('docs/architecture.md','utf8');
+for(const term of ['lib/domain','lib/server','dependency direction','client']) assert.ok(architecture.includes(term), 'architecture.md missing '+term);
+const adrs=readdirSync('docs/adr').filter(f=>/^00\d\d-.*\.md$/.test(f));
+assert.ok(adrs.length>=4, 'expected at least 4 ADRs, found '+adrs.length);
+const agents=readFileSync('AGENTS.md','utf8');
+for(const s of ['pnpm test','pnpm run typecheck','pnpm run lint','pnpm run build','0 errors']) assert.ok(agents.includes(s), 'AGENTS.md missing '+s);
+const contributing=readFileSync('CONTRIBUTING.md','utf8');
+assert.ok(contributing.toLowerCase().includes('branch protection'), 'CONTRIBUTING.md missing branch-protection note');
+console.log('Architecture contracts passed');
