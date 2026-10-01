@@ -10,12 +10,12 @@ import {roleLabels,rolePermissions,permissionLabels,type AppUser,type Role,type 
 import {Choice,Tick,readResponse,put} from './form-fields';
 export function UserManager({onDirty,navigate}:{onDirty:(v:boolean)=>void;navigate:(action:()=>void)=>void}){
  const [users,setUsers]=useState<AppUser[]>([]),[value,setValue]=useState<AppUser|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[query,setQuery]=useState('');
- const load=useCallback(async()=>{setLoading(true);setError('');try{const d=await readResponse(await fetch('/api/users',{cache:'no-store'}));setUsers(d.users);}catch(e){setError((e as Error).message);}finally{setLoading(false);}},[]);
- useEffect(()=>{void load();},[load]);
+ const load=useCallback(async()=>{setLoading(true);setError('');try{const d=await readResponse<{users:AppUser[]}>(await fetch('/api/users',{cache:'no-store'}));setUsers(d.users);}catch(e){setError((e as Error).message);}finally{setLoading(false);}},[]);
+ useEffect(()=>{let cancelled=false;void(async()=>{try{const d=await readResponse<{users:AppUser[]}>(await fetch('/api/users',{cache:'no-store'}));if(!cancelled){setUsers(d.users);setError('');}}catch(e){if(!cancelled)setError((e as Error).message);}finally{if(!cancelled)setLoading(false);}})();return()=>{cancelled=true;};},[]);
  function select(user:AppUser|null){navigate(()=>{setValue(user);setError('');onDirty(false);});}
  function add(){select({id:'',name:'',email:'',role:'tester',permissions:rolePermissions('tester'),systems:[...plan.systems],active:true,version:0,updatedAt:''});}
  function update(p:Partial<AppUser>){setValue(v=>v?{...v,...p}:null);onDirty(true);setError('');}
- async function save(e:React.FormEvent){e.preventDefault();setBusy(true);setError('');try{const d=await put('/api/users',value);setUsers(p=>[...p.filter(x=>x.id!==d.user.id),d.user]);setValue(d.user);onDirty(false);toast.success('حُفظ المستخدم وصلاحياته');}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
+ async function save(e:React.FormEvent){e.preventDefault();setBusy(true);setError('');try{const d=await put<{user:AppUser}>('/api/users',value);setUsers(p=>[...p.filter(x=>x.id!==d.user.id),d.user]);setValue(d.user);onDirty(false);toast.success('حُفظ المستخدم وصلاحياته');}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
  const filtered=users.filter(u=>(u.name+' '+u.email).toLowerCase().includes(query.trim().toLowerCase()));
  return <section className="plan-surface admin-surface"><div className="section-heading"><div><h2><Users size={22}/>إدارة المستخدمين والصلاحيات</h2><p>حدد الإجراءات والأنظمة المتاحة لكل حساب، وأوقف صلاحياته عند الحاجة.</p></div><Button onClick={add} disabled={loading||busy}><UserPlus size={17}/>إضافة مستخدم</Button></div>
  <div className="access-note"><ShieldCheck size={20}/><p>هذه الشاشة تضبط صلاحيات الأداة فقط. حفظ مستخدم لا يمنحه وصولاً إلى رابط الموقع ولا يرسل دعوة. يظل الوصول خاضعاً لمشاركة الموقع الخاص، وتُطبّق الصلاحيات بعد دخوله بحسابه المحدد.</p></div>

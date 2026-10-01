@@ -62,3 +62,44 @@ Excluded generated tsconfig.tsbuildinfo, local dependencies, .wrangler databases
 Added governance, CI, test/typecheck scripts, architecture contracts and service setup documentation. Full original lint baseline reports 45 errors and 14 warnings; not disabled or represented as passing. PR remains draft pending lint repair, successful CI and independent review.
 Remote branch protections NOT enabled: connector exposes no ruleset/protection mutation and browser has no authenticated session. Administrator must apply rules documented in CONTRIBUTING.md. GitHub is intended development authority; this remains a draft import until accepted. No automatic Sites publishing bridge was added.
 Validation in separate import checkout: model and enhancement behavior suites PASS; architecture contracts PASS; TypeScript --noEmit PASS; portable Vinext production build PASS; staged git diff --check PASS after trimming one original trailing blank line in tests/model.mjs. Existing complete lint: 45 errors / 14 warnings (code baseline, not external failure). CI has not yet been observed. Build/test reused existing installed dependencies; clean network dependency installation is deferred to GitHub Actions.
+
+## 2026-10-01 — Lint blocker repair (Issue #4)
+
+The import worklog recorded that the existing lint reported 45 errors / 14 warnings
+and that this blocked merging until repaired. `develop` carried that failing lint
+baseline, so CI (`pnpm run lint`) was red. This change repairs the lint blocker so
+all standard gates pass on `develop`.
+
+Baseline recorded on `develop` before the change: `pnpm test` PASS, `pnpm run
+typecheck` PASS, `pnpm run lint` FAIL (45 errors / 14 warnings), `pnpm run build`
+PASS. Breakdown: 36 `@typescript-eslint/no-explicit-any`, 7
+`react-hooks/set-state-in-effect`, 1 `react-hooks/refs`, 1
+`@typescript-eslint/no-unsafe-function-type`; 7 `@typescript-eslint/no-unused-vars`,
+7 `react-hooks/exhaustive-deps`.
+
+Approach (behavior-preserving, no rule weakening, no file exclusion):
+- Added `app/api/types.ts` with typed D1 row interfaces (`ResultRow`, `EvidenceRow`,
+  `ScreenFormRow`, `TestDataRow`/`TestDataRowData`, `PublishedFormRow`,
+  `AppUserRow`, `TestFormVersionRow`, `TestFormRow`, `CountRow`, `EmailRow`).
+  Replaced `.first<any>()` / `.all<any>()` / `(x:any)=>` across all API routes.
+- Made `readResponse`/`put` generic; call sites pass explicit response shapes.
+- Request bodies cast to their domain types (`Result`, `TestData`) before the
+  existing `unknown`-accepting validators run; pre-validation string access uses
+  null-safe `?? ''` so the server still rejects unknown tests.
+- `resultRow` now returns `Result` with `status` cast to `Status`; `conflict()`
+  annotated `:never` so null-guards narrow.
+- Replaced the `Function` tool-registration type with a typed signature.
+- Refactored the 7 `set-state-in-effect` effects to verified-acceptable patterns:
+  render-phase state adjustment for prop-sync (no effect), async-IIFE with
+  `setState` after `await` for data load, `Promise.resolve().then(...)` deferral for
+  the one-shot route sync, and an effect for ref sync. The `react-hooks/refs`
+  write-during-render moved to an effect.
+- Removed unused imports (`Evidence`, `nonInputs`, `getTestForm`/`formSelect`/
+  `testFormRow`, `second`/`screen`) and resolved `exhaustive-deps` warnings by
+  adding missing deps or using a ref for the unstable callback.
+
+Result: `pnpm test` PASS, `pnpm run typecheck` PASS, `pnpm run lint` PASS (0 errors
+/ 0 warnings), `pnpm run build` PASS, `git diff --check` clean. No API contract,
+page title, data id, schema, storage, Arabic RTL/Tajawal, draft-vs-published
+separation, result↔form version binding, server-side tester identity/permissions,
+or evidence integrity changed. No DB migration, no production data touched.

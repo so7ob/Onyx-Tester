@@ -1,4 +1,4 @@
-import {validateExtras,assertDependencies,computedValues,effectiveField,nonInputs,type ExtraProperties} from './advanced-model';
+import {validateExtras,assertDependencies,computedValues,effectiveField,type ExtraProperties} from './advanced-model';
 import {plan,states,priorityLabels,testMap,validateResult,type TestCase,type Result} from './model';
 import {fieldTypes,validateFieldValue,validateValues,validateTestData,version,type CustomField,type FieldValue,type ScreenForm,type TestData,type AppUser} from './admin-model';
 export const groupLabels={instructions:'تعليمات الاختبار',execution:'نموذج التنفيذ',preparation:'بيانات التهيئة'} as const;
@@ -86,8 +86,8 @@ export function validateConfiguredData(input:unknown,form:TestForm):TestData {
  for(const f of form.fields.filter(f=>f.kind==='builtin'&&f.active&&f.group==='preparation'&&f.key!=='ready'))validateFieldValue(f as CustomField,value[f.key as keyof TestData] as FieldValue,v.ready);
  return value;
 }
-export function initialResult(t:TestCase,user:AppUser,form:TestForm,data?:TestData):Result{const r:Result={id:t.id,status:'planned',actual:'',notes:'',tester:user.name,evidenceUrl:'',documentNumber:'',linkedDocumentNumber:'',customValues:{},version:0,updatedAt:''};for(const f of form.fields.filter(f=>f.group==='execution'&&f.active)){if(f.kind==='custom'&&!['heading','note'].includes(f.type))r.customValues[f.id]=f.preparationSource&&data&&Object.hasOwn(dataValues(data),f.preparationSource)?dataValues(data)[f.preparationSource]:f.defaultValue;else if(f.key&&f.key in r&&f.key!=='tester')(r as any)[f.key]=f.preparationSource&&data&&Object.hasOwn(dataValues(data),f.preparationSource)?dataValues(data)[f.preparationSource]:f.defaultValue;}return r;}
-export function initialData(testId:string,form:TestForm):TestData{const value:TestData={testId,party:'',amount:'',currency:'',documentNumber:'',date:'',branch:'',notes:'',customValues:{},ready:false,version:0,updatedAt:''};for(const f of form.fields.filter(f=>f.group==='preparation'&&f.active)){if(f.kind==='custom'&&!['heading','note'].includes(f.type))value.customValues[f.id]=f.defaultValue;else if(f.key&&f.key in value)(value as any)[f.key]=f.defaultValue;}return value;}
+export function initialResult(t:TestCase,user:AppUser,form:TestForm,data?:TestData):Result{const r:Result={id:t.id,status:'planned',actual:'',notes:'',tester:user.name,evidenceUrl:'',documentNumber:'',linkedDocumentNumber:'',customValues:{},version:0,updatedAt:''};for(const f of form.fields.filter(f=>f.group==='execution'&&f.active)){if(f.kind==='custom'&&!['heading','note'].includes(f.type))r.customValues[f.id]=f.preparationSource&&data&&Object.hasOwn(dataValues(data),f.preparationSource)?dataValues(data)[f.preparationSource]:f.defaultValue;else if(f.key&&f.key in r&&f.key!=='tester')(r as unknown as Record<string,FieldValue>)[f.key]=f.preparationSource&&data&&Object.hasOwn(dataValues(data),f.preparationSource)?dataValues(data)[f.preparationSource]:f.defaultValue;}return r;}
+export function initialData(testId:string,form:TestForm):TestData{const value:TestData={testId,party:'',amount:'',currency:'',documentNumber:'',date:'',branch:'',notes:'',customValues:{},ready:false,version:0,updatedAt:''};for(const f of form.fields.filter(f=>f.group==='preparation'&&f.active)){if(f.kind==='custom'&&!['heading','note'].includes(f.type))value.customValues[f.id]=f.defaultValue;else if(f.key&&f.key in value)(value as unknown as Record<string,FieldValue>)[f.key]=f.defaultValue;}return value;}
 export function resultValues(r:Result,tester:string){return {...r.customValues,...Object.fromEntries(['status','actual','notes','documentNumber','linkedDocumentNumber','evidenceUrl'].map(key=>['execution.'+key,r[key as keyof Result] as FieldValue])),'execution.tester':tester};}
 export function dataValues(d:TestData){return {...d.customValues,...Object.fromEntries(['party','amount','currency','documentNumber','date','branch','notes','ready'].map(key=>['preparation.'+key,d[key as keyof TestData] as FieldValue]))};}
 export function getContent(form:TestForm,key:string){return form.fields.find(f=>f.id==='instructions.'+key);}
@@ -107,7 +107,7 @@ export function defaultChanges(form:TestForm,group:'execution'|'preparation',val
 }
 export function applyDefaultChanges<T extends Result|TestData>(value:T,changes:DefaultChange[]):T{
  const next={...value,customValues:{...value.customValues}};
- for(const {field,after} of changes){if(field.kind==='custom')next.customValues[field.id]=after;else if(field.key)(next as any)[field.key]=after;}
+ for(const {field,after} of changes){if(field.kind==='custom')next.customValues[field.id]=after;else if(field.key)(next as unknown as Record<string,FieldValue>)[field.key]=after;}
  return next;
 }
 export function hydrateResult(t:TestCase,user:AppUser,form:TestForm,saved?:Result,data?:TestData):Result{return saved?applyDefaultChanges(saved,defaultChanges(form,'execution',resultValues(saved,user.name),true)):initialResult(t,user,form,data);}

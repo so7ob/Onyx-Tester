@@ -9,8 +9,8 @@ export function Choice({value,onChange,label,options,disabled=false}:{value:stri
  return <Select dir="rtl" value={value} onValueChange={onChange} disabled={disabled}><SelectTrigger aria-label={label} className="choice"><SelectValue/></SelectTrigger><SelectContent position="popper">{options.map(([v,l])=><SelectItem key={v} value={v}>{l}</SelectItem>)}</SelectContent></Select>;
 }
 export function Tick({checked,onChange,children,disabled=false}:{checked:boolean;onChange:(v:boolean)=>void;children:React.ReactNode;disabled?:boolean}){return <label className="tick"><Checkbox checked={checked} onCheckedChange={v=>onChange(v===true)} disabled={disabled}/><span>{children}</span></label>;}
-export async function readResponse(response:Response):Promise<any>{const data=await response.json() as any;if(!response.ok)throw new Error(data.error??'تعذر إتمام الطلب.');return data;}
-export async function put(url:string,value:unknown){return readResponse(await fetch(url,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(value)}));}
+export async function readResponse<T>(response:Response):Promise<T>{const data:unknown=await response.json();if(!response.ok)throw new Error((data as {error?:string}|null)?.error??'تعذر إتمام الطلب.');return data as T;}
+export async function put<T>(url:string,value:unknown){return readResponse<T>(await fetch(url,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(value)}));}
 export function CustomFields({fields,group,values,onChange,required=false,disabled=false,preview=false}:{fields:CustomField[];group:CustomField['group'];values:Values;onChange:(id:string,v:FieldValue)=>void;required?:boolean;disabled?:boolean;preview?:boolean}){
  return <div className="custom-fields">{fields.filter(f=>f.active&&f.group===group).map(f=>{const value=values[f.id]??f.defaultValue;const id=(preview?'preview-':'field-')+f.id;const req=required&&f.required;
  if(f.type==='heading')return <h4 key={f.id} className="custom-heading">{f.label}</h4>;
