@@ -1,6 +1,12 @@
 # ONYX upgrade tester
 Arabic RTL application for independent per-screen ERP upgrade tests, configurable test forms, execution results, approvals and evidence. Preserves original React/Vinext, TypeScript, Tailwind, Drizzle and Cloudflare architecture.
 
+## Architecture and methodology
+- **Where code belongs and why**: see [`docs/architecture.md`](docs/architecture.md) for module boundaries, the one-way dependency direction, and the client/server split.
+- **Why those decisions were made**: see [`docs/adr/`](docs/adr/) for the architecture decision records.
+- **How to contribute**: see [`CONTRIBUTING.md`](CONTRIBUTING.md) and [`AGENTS.md`](AGENTS.md) for the mandatory workflow, naming, the required checks (`pnpm test`, `pnpm run typecheck`, `pnpm run lint` at **0 errors**, `pnpm run build`, `git diff --check`), and the branch-protection status.
+- **Build history**: see [`docs/worklog.md`](docs/worklog.md).
+
 ## Development
 Requires Node >=22.13.0 (CI Node 24), pnpm 11.25.0. Run `pnpm install --frozen-lockfile`, then `pnpm dev`. Build using `pnpm run build`; `pnpm start` runs the built Worker locally. Run `pnpm test`, `pnpm run typecheck`, `pnpm run lint`, `git diff --check`. Keep the original lockfile. Tests use Node SQLite and ephemeral databases; never use production data.
 
