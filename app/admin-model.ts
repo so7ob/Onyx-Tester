@@ -46,7 +46,7 @@ export function validateForm(value:unknown):ScreenForm {
  });return {screenId:v.screenId,fields,version:version(v.version),updatedAt:''};
 }
 export function validateFieldValue(f:CustomField,value:FieldValue,required:boolean){
- if(Object.hasOwn(advancedTypes,f.type)){validateAdvancedValue(f as any,value,required);return;}
+ if(Object.hasOwn(advancedTypes,f.type)){validateAdvancedValue(f,value,required);return;}
  if(['heading','note'].includes(f.type))return;
  const empty=value==='';if(required&&f.required&&empty)throw new Error('الحقل «'+f.label+'» مطلوب.');
  if(f.type==='boolean'){if(typeof value!=='boolean')throw new Error('قيمة «'+f.label+'» غير صحيحة.');return;}

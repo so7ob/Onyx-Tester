@@ -10,7 +10,7 @@ const files=['app/model.ts','app/admin-model.ts','app/editor-model.ts','app/adva
 try{
  for(const file of files){let source=readFileSync(file,'utf8');if(file==='app/model.ts')source=source.replace("import raw from './data/plan.json';",'const raw='+readFileSync('app/data/plan.json','utf8')+';');source=source.replace("import {env} from 'cloudflare:workers';",'const env=globalThis.__onyxTestEnv;').replaceAll('__ONYX_LOCAL_PREVIEW__','false');let js=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText;js=js.replace(/from (['"])(\.[^'"]+)\1/g,(_all,q,name)=>'from '+q+name+'.mjs'+q);const target=path.join(root,file.replace(/\.ts$/,'.mjs'));mkdirSync(path.dirname(target),{recursive:true});writeFileSync(target,js);}
  const sql=new DatabaseSync(':memory:');sql.exec(readFileSync('drizzle/0000_pale_solo.sql','utf8'));
- const source=JSON.parse(readFileSync('app/data/plan.json','utf8'));const first=source.tests[0],second=source.tests.find(t=>t.system!==first.system);const screen=source.screens.find(s=>s.testIds.includes(first.id));
+ const source=JSON.parse(readFileSync('app/data/plan.json','utf8'));const first=source.tests[0];
  // Verify deployed legacy rows migrate without losing their saved results.
  sql.prepare('INSERT INTO results VALUES (?,?,?,?,?,?,?,?)').run(first.id,'planned','legacy result','','','',1,'2026-09-01T00:00:00Z');
  sql.exec(readFileSync('drizzle/0001_numerous_blackheart.sql','utf8'));
