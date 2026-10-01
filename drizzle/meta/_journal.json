@@ -1,0 +1,48 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1790806485404,
+      "tag": "0000_pale_solo",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1790809004840,
+      "tag": "0001_numerous_blackheart",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1790809954275,
+      "tag": "0002_sharp_frank_castle",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1790811994270,
+      "tag": "0003_noisy_tomorrow_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1790869704451,
+      "tag": "0004_complete_mister_fear",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1790870518284,
+      "tag": "0005_flaky_raza",
+      "breakpoints": true
+    }
+  ]
+}
