@@ -1,0 +1,26 @@
+import {readFileSync} from 'node:fs';
+import assert from 'node:assert/strict';
+import ts from 'typescript';
+const raw=JSON.parse(readFileSync('app/data/plan.json','utf8'));
+const source=readFileSync('app/model.ts','utf8').replace("import raw from './data/plan.json';",'const raw='+JSON.stringify(raw)+';');
+const js=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText;
+const m=await import('data:text/javascript;base64,'+Buffer.from(js).toString('base64'));
+assert.equal(raw.systems.length,18);assert.equal(raw.tests.length,245);assert.equal(raw.screens.length,180);assert.equal(raw.pending.length,3);
+assert.equal(new Set(raw.tests.map(t=>t.id)).size,raw.tests.length);
+for(const s of raw.screens)for(const id of s.testIds){const t=m.testMap.get(id);assert.equal(t.system,s.system);assert.equal(t.screen,s.name);assert.equal(t.verification,'موثقة من المصدر');}
+assert.equal(raw.screens.flatMap(s=>s.testIds).length,245);
+const a=raw.tests[0],b=raw.tests[1];
+const r={id:a.id,status:'passed',actual:'قيمة اختبار',notes:'',tester:'',evidenceUrl:'https://example.com/evidence',version:0};
+assert.equal(m.validateResult(r).status,'passed');
+assert.throws(()=>m.validateResult({...r,id:'fake-screen'}));
+assert.throws(()=>m.validateResult({...r,actual:''}));
+assert.throws(()=>m.validateResult({...r,evidenceUrl:'javascript:alert(1)'}));
+assert.throws(()=>m.validateResult({...r,status:'__proto__'}));
+assert.throws(()=>m.validateResult({...r,version:-1}));
+const summary=m.summarize([a,b],{[a.id]:r,[b.id]:{...r,id:b.id,status:'blocked'}});
+assert.equal(summary.completed,1);assert.equal(summary.stalled,1);assert.equal(summary.percent,50);
+assert.equal(m.screenStatus([a,b],{[a.id]:r}),'in_progress');
+assert.equal(m.screenStatus([a],{[a.id]:r}),'passed');
+assert.equal(m.screenStatus([a],{[a.id]:{...r,status:'failed'}}),'failed');
+assert(m.matches(a,a.id));assert(m.matches(a,'ملاحظة تجريبية',{...r,notes:'ملاحظة تجريبية'}));assert(!m.matches(a,'لا يوجد اسم شاشة كهذا'));
+console.log('PASS: source coverage, one-screen forms, result validation, safe evidence links, summaries, status aggregation, search.');
