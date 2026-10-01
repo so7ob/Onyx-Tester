@@ -144,3 +144,35 @@ reviewable; a clearer-naming follow-up is documented in ADR 0003.
 
 Stacked on docs/architecture-and-methodology (PR #6), which is stacked on
 fix/4-lint-blocker (PR #5).
+
+## 2026-10-01 — Server layer extracted to lib/server (Issue #4, refactor step 3)
+
+`app/api/` mixed D1/R2 access, error handling, auth, and typed rows with the
+route handlers themselves, and the `app/api/results/route.ts` file doubled as a
+shared module (exporting `resultRow`/`select` imported by `results/lifecycle`).
+This change moves the server layer into `lib/server/` so route handlers become
+thin delegators and data access/auth live in their own modules (ADR 0003 step 3).
+
+File map (old → new, by responsibility):
+| old | new | responsibility |
+|---|---|---|
+| app/api/storage.ts | lib/server/db.ts | D1/R2 binding access (db(), bucket()) |
+| app/api/storage.ts | lib/server/errors.ts | ApiError, checked, checkOrigin, unavailable |
+| app/api/types.ts | lib/server/rows.ts | typed D1 row interfaces |
+| app/api/auth.ts | lib/server/auth.ts | authorize, userRow, owner*, getForm/getTestForm/getPublishedForm, conflict, testSystem, screenForTest |
+| resultRow+select (in app/api/results/route.ts) | lib/server/results.ts | results-specific row mapper + SQL select alias map |
+
+Route files updated to import from lib/server (splitting the old `../storage`
+import into db + errors). `app/api/storage.ts` deleted (content split into
+db.ts + errors.ts). `tests/enhancements.mjs` file list + the cloudflare-workers
+import strip (now a regex) updated; `tests/architecture.mjs` extended to assert
+the lib/server boundary is binding (the 5 server files exist in lib/server/, not
+in app/api/; auth imports domain).
+
+Result: pnpm test PASS (incl. new lib/server boundary assertions), pnpm run
+typecheck PASS, pnpm run lint PASS (0/0), pnpm run build PASS, git diff --check
+clean. Behavior-preserving: no API contract, page title, data id, schema,
+storage, Arabic RTL/Tajawal, draft/published separation, result↔form version
+binding, server-side tester identity/permissions, or evidence integrity changed.
+
+Stacked on refactor/4-extract-domain-to-lib (PR #7) ← docs (PR #6) ← fix (PR #5).

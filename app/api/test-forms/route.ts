@@ -1,7 +1,8 @@
-import {db,checkOrigin,unavailable,checked,ApiError} from '../storage';
-import {authorize,testSystem,getPublishedForm,getTestForm,formSelect,testFormRow,conflict} from '../auth';
+import {db} from '../../../lib/server/db';
+import {checkOrigin,unavailable,checked,ApiError} from '../../../lib/server/errors';
+import {authorize,testSystem,getPublishedForm,getTestForm,formSelect,testFormRow,conflict} from '../../../lib/server/auth';
 import {validateTestForm} from '../../../lib/domain/editor-model';
-import type {TestFormVersionRow,TestFormRow} from '../types';
+import type {TestFormVersionRow,TestFormRow} from '../../../lib/server/rows';
 const headers={'Cache-Control':'private, no-store'};
 export async function GET(request:Request){try{await authorize(request);const id=new URL(request.url).searchParams.get('testId')??'';await authorize(request,'view',testSystem(id));const editing=new URL(request.url).searchParams.get('mode')!=='published';if(editing)await authorize(request,'design',testSystem(id));const form=editing?await getTestForm(id):await getPublishedForm(id);const rows=editing?await db().prepare('SELECT version,created_at AS createdAt,actor_name AS actorName,snapshot FROM test_form_versions WHERE test_id=? ORDER BY version DESC LIMIT 20').bind(id).all<TestFormVersionRow>():{results:[]};return Response.json({form,revisions:rows.results.map(r=>({...r,snapshot:JSON.parse(r.snapshot)}))},{headers});}catch(e){return unavailable(e);}}
 export async function PUT(request:Request){const rejected=checkOrigin(request);if(rejected)return rejected;try{

@@ -1,10 +1,11 @@
-import {authorize,testSystem,getPublishedForm,conflict} from '../../auth';
-import {db,checkOrigin,unavailable,ApiError} from '../../storage';
+import {authorize,testSystem,getPublishedForm,conflict} from '../../../../lib/server/auth';
+import {db} from '../../../../lib/server/db';
+import {checkOrigin,unavailable,ApiError} from '../../../../lib/server/errors';
 import type {TestData} from '../../../../lib/domain/admin-model';
 import {testMap} from '../../../../lib/domain/model';
 import {initialResult,validateConfiguredResult} from '../../../../lib/domain/editor-model';
-import {select,resultRow} from '../route';
-import type {ResultRow} from '../../types';
+import {select,resultRow} from '../../../../lib/server/results';
+import type {ResultRow} from '../../../../lib/server/rows';
 export async function GET(request:Request){try{const id=new URL(request.url).searchParams.get('testId')??'';await authorize(request,'view',testSystem(id));const rows=await db().prepare('SELECT id,snapshot,evidence,created_at AS createdAt FROM result_history WHERE test_id=? ORDER BY created_at DESC LIMIT 100').bind(id).all<{id:string;snapshot:string;evidence:string;createdAt:string}>();return Response.json({history:rows.results.map(r=>({...r,snapshot:JSON.parse(r.snapshot),evidence:JSON.parse(r.evidence)}))},{headers:{'Cache-Control':'private, no-store'}});}catch(e){return unavailable(e);}}
 export async function POST(request:Request){const rejected=checkOrigin(request);if(rejected)return rejected;try{
  const body=await request.json() as {testId:string;version:number;action:'new'|'approve'};const actor=await authorize(request,body.action==='approve'?'review':'execute',testSystem(body.testId));const current=await db().prepare('SELECT '+select+' FROM results WHERE id=?').bind(body.testId).first<ResultRow>();if((current?.version??0)!==body.version)conflict();const now=new Date().toISOString();

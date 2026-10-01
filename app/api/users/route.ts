@@ -1,7 +1,8 @@
-import {db,checkOrigin,unavailable,checked,ApiError} from '../storage';
-import {authorize,ownerEmail,ownerProfile,userRow,conflict} from '../auth';
+import {db} from '../../../lib/server/db';
+import {checkOrigin,unavailable,checked,ApiError} from '../../../lib/server/errors';
+import {authorize,ownerEmail,ownerProfile,userRow,conflict} from '../../../lib/server/auth';
 import {validateUser} from '../../../lib/domain/admin-model';
-import type {AppUserRow,EmailRow} from '../types';
+import type {AppUserRow,EmailRow} from '../../../lib/server/rows';
 export async function GET(request:Request){try{await authorize(request,'manageUsers');const owner=await db().prepare("SELECT name FROM site_owner WHERE id='owner'").first<{name:string}>();const rows=await db().prepare('SELECT * FROM app_users ORDER BY name').all<AppUserRow>();return Response.json({users:[ownerProfile(ownerEmail(),owner?.name||ownerEmail()),...rows.results.map(userRow)]},{headers:{'Cache-Control':'private, no-store'}});}catch(e){return unavailable(e);}}
 export async function PUT(request:Request){const rejected=checkOrigin(request);if(rejected)return rejected;try{await authorize(request,'manageUsers');const body=await request.json();const value=checked(()=>validateUser(body,ownerEmail()));const now=new Date().toISOString();
  if(value.id){const existing=await db().prepare('SELECT email FROM app_users WHERE id=?').bind(value.id).first<EmailRow>();if(!existing)conflict();if(existing.email!==value.email)throw new ApiError('البريد هو هوية المستخدم ولا يتغير بعد الإنشاء. أوقف الحساب وأضف حساباً آخر.');}

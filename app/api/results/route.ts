@@ -1,11 +1,11 @@
-import {db,checkOrigin,unavailable,checked,ApiError} from '../storage';
-import {plan,type Status,type Result} from '../../../lib/domain/model';
+import {db} from '../../../lib/server/db';
+import {checkOrigin,unavailable,checked,ApiError} from '../../../lib/server/errors';
+import {plan,type Result} from '../../../lib/domain/model';
 import {protectValues} from '../../../lib/domain/advanced-model';
 import {resultValues,validateConfiguredResult} from '../../../lib/domain/editor-model';
-import {authorize,testSystem,getPublishedForm,conflict} from '../auth';
-import type {ResultRow,EvidenceRow,ScreenFormRow,TestDataRow,PublishedFormRow} from '../types';
-export function resultRow(row:ResultRow):Result{return {...row,status:row.status as Status,customValues:JSON.parse(row.customValues),formSnapshot:row.formSnapshot?JSON.parse(row.formSnapshot):undefined};}
-export const select='run_id AS runId,started_at AS startedAt,approved_at AS approvedAt,approved_by AS approvedBy,form_snapshot AS formSnapshot,id,status,actual,notes,tester,tester_id AS testerId,tester_email AS testerEmail,evidence_url AS evidenceUrl,document_number AS documentNumber,linked_document_number AS linkedDocumentNumber,custom_values AS customValues,version,updated_at AS updatedAt';
+import {authorize,testSystem,getPublishedForm,conflict} from '../../../lib/server/auth';
+import type {ResultRow,EvidenceRow,ScreenFormRow,TestDataRow,PublishedFormRow} from '../../../lib/server/rows';
+import {resultRow,select} from '../../../lib/server/results';
 export async function GET(request:Request){try{
  const user=await authorize(request);const allowed=new Set(plan.tests.filter(t=>user.systems.includes(t.system)).map(t=>t.id));const screens=new Set(plan.screens.filter(s=>user.systems.includes(s.system)).map(s=>s.id));
  const [r,e,f,d,tf]=await Promise.all([db().prepare('SELECT '+select+' FROM results').all<ResultRow>(),db().prepare('SELECT id,test_id AS testId,run_id AS runId,name,size FROM evidence ORDER BY created_at').all<EvidenceRow>(),db().prepare('SELECT screen_id AS screenId,fields,version,updated_at AS updatedAt FROM screen_forms').all<ScreenFormRow>(),db().prepare('SELECT test_id AS testId,party,amount,currency,document_number AS documentNumber,date,branch,notes,custom_values AS customValues,ready,version,updated_at AS updatedAt FROM test_data').all<TestDataRow>(),db().prepare('SELECT test_id AS testId,snapshot FROM published_forms').all<PublishedFormRow>()]);
