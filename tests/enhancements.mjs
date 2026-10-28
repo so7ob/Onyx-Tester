@@ -45,6 +45,23 @@ try{
  const published=async id=>(await expect(await testForms.GET(request('test-forms?mode=published&testId='+id)),200)).form;
  const publish=async f=>expect(await publication.POST(request('test-forms/publish','POST',{testId:f.testId,version:f.version})),200);
  const original=await get(fresh.id);
+ { // Editor creation/duplication must survive the same validation as saved forms.
+ const created=['boolean','consent','table'].map(type=>editor.createCustomField('execution',type,()=>crypto.randomUUID()));
+ assert.equal(created[0].defaultValue,false);assert.equal(created[1].defaultValue,false);assert.equal(created[2].columns.length,2);
+ const consent={...created[1],label:'موافقة',defaultValue:true};
+ const table={...created[2],label:'جدول مخصص',columns:[{id:'amount',label:'المبلغ',type:'number',required:true,width:180}],defaultValue:JSON.stringify([{id:'row1',cells:{amount:'0'}}]),condition:{fieldId:'execution.status',operator:'eq',value:'failed',action:'show'},layout:{desktop:12,tablet:12,mobile:12,rows:3,height:0,gap:0}};
+ const copies=[consent,table].map(f=>editor.createCustomField('execution',f.type,()=>crypto.randomUUID(),f));
+ assert.equal(copies[0].defaultValue,true);assert.deepEqual(copies[1].columns,table.columns);assert.equal(copies[1].defaultValue,table.defaultValue);assert.deepEqual(copies[1].condition,table.condition);
+ const repeatedField=editor.createCustomField('execution','table',()=>crypto.randomUUID(),table);assert.notEqual(repeatedField.id,copies[1].id);
+ repeatedField.columns[0].label='تعديل النسخة';repeatedField.layout.gap=8;repeatedField.condition.value='passed';assert.equal(table.columns[0].label,'المبلغ');assert.equal(table.layout.gap,0);assert.equal(table.condition.value,'failed');
+ for(const value of [false,'','0'])assert.equal(editor.createCustomField('execution','text',()=>crypto.randomUUID(),{...created[0],defaultValue:value}).defaultValue,value);
+ const longCopy=editor.createCustomField('execution','boolean',()=>crypto.randomUUID(),{...created[0],label:'س'.repeat(120)});assert(longCopy.label.length<=120);
+ const editorTest=source.tests.find(t=>![first.id,fresh.id,other.id].includes(t.id));
+ const editorForm=await get(editorTest.id);
+ const editorSaved=(await expect(await send(testForms,'test-forms',{...editorForm,fields:[...editorForm.fields,created[0],consent,table,...copies]}),200)).form;
+ const editorReloaded=await get(editorTest.id);assert.deepEqual(editorReloaded.fields,editorSaved.fields);
+ assert.equal(editorReloaded.fields.find(f=>f.id===copies[0].id).defaultValue,true);assert.deepEqual(editorReloaded.fields.find(f=>f.id===copies[1].id).columns,table.columns);
+ }
  const field={id:crypto.randomUUID(),kind:'custom',label:'رقم وثيقة إضافي',type:'code',group:'execution',help:'',placeholder:'',required:false,wide:false,active:true,options:[],defaultValue:'NEW-DEFAULT',min:'',max:'',layout:{desktop:4,tablet:6,mobile:12,rows:3,height:70,gap:4},appearance:{color:'#112233',background:'#ffffff',fontSize:18,radius:9}};
  const bool={...field,id:crypto.randomUUID(),type:'boolean',label:'خيار',defaultValue:true,group:'preparation'},number={...field,id:crypto.randomUUID(),type:'number',label:'رقم',defaultValue:'8',group:'preparation'};
  const conditional={...field,id:crypto.randomUUID(),label:'تفاصيل الفشل',type:'textarea',defaultValue:'',required:true,condition:{fieldId:'execution.status',operator:'eq',value:'failed',action:'show'}};

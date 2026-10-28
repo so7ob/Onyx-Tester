@@ -11,6 +11,13 @@ const locked=['execution.status','execution.actual','preparation.ready'];
 export const isLockedVisible=(f:FormField)=>locked.includes(f.id);
 export const isReadOnlyValue=(f:FormField)=>['execution.tester','execution.file','instructions.reference'].includes(f.id);
 function field(group:FormGroup,key:string,label:string,type:FormField['type'],value:FieldValue='',props:Partial<FormField>={}):FormField{return {id:group+'.'+key,kind:'builtin',key,label,type,group,help:'',placeholder:'',required:false,wide:false,active:true,options:[],defaultValue:value,min:'',max:'',...props};}
+// Copy nested settings without changing references to other fields or table cell keys.
+export function createCustomField(group:FormGroup,type:FormField['type'],newId:()=>string,copy?:FormField):FormField {
+ if(copy)return {...structuredClone(copy),id:newId(),kind:'custom',key:undefined,label:copy.label.slice(0,113)+' — نسخة'};
+ const f:FormField={id:newId(),kind:'custom',label:'حقل جديد',type,group,help:'',placeholder:'',required:false,wide:group==='instructions',active:true,options:[],defaultValue:['boolean','consent'].includes(type)?false:'',min:'',max:''};
+ if(type==='table')f.columns=[{id:newId(),label:'الإجراء',type:'text',required:false,width:220},{id:newId(),label:'النتيجة',type:'text',required:false,width:220}];
+ return f;
+}
 export function baseFields(t:TestCase):FormField[]{return [
  field('instructions','scenario','سيناريو الاختبار','content',t.scenario,{wide:true}),
  field('instructions','operation','العملية','content',t.operation,{active:false}),
