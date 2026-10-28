@@ -42,5 +42,5 @@ export function ConfiguredFields({form,group,values:inputValues,onChange,require
  }
  const groups:({name:string;fields:FormField[]}|FormField)[]=[];
  for(const f of items){if(!f.section){groups.push(f);continue;}const last=groups.at(-1);if(last&&'name' in last&&last.name===f.section)last.fields.push(f);else groups.push({name:f.section,fields:[f]});}
- return <div className="configured-fields">{conditionErrors.map((error,i)=><p key={i} role="alert" className="form-error">{error}</p>)}{groups.map((item,i)=>'name' in item?<details className="dynamic-section" key={'section-'+i} open><summary>{item.name}</summary><div className="configured-fields">{item.fields.map(render)}</div></details>:render(item))}</div>;
+ return <div className="configured-fields">{conditionErrors.map((error,i)=><p key={i} role="alert" className="form-error" style={{gridColumn:'1 / -1'}}>{error}</p>)}{groups.map((item,i)=>'name' in item?<details className="dynamic-section" key={'section-'+i} open><summary>{item.name}</summary><div className="configured-fields">{item.fields.map(render)}</div></details>:render(item))}</div>;
 }
