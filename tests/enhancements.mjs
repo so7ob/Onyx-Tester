@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import ts from 'typescript';
 const root=mkdtempSync(path.join(tmpdir(),'onyx-tests-'));
-const files=['lib/domain/model.ts','lib/domain/admin-model.ts','lib/domain/editor-model.ts','lib/domain/advanced-model.ts','lib/domain/form-export.ts','app/api/results/lifecycle/route.ts','app/api/test-forms/publish/route.ts','lib/domain/navigation-model.ts','lib/server/db.ts','lib/server/errors.ts','lib/server/rows.ts','lib/server/results.ts','lib/server/auth.ts','app/api/results/route.ts','app/api/users/route.ts','app/api/forms/route.ts','app/api/test-forms/route.ts','app/api/test-data/route.ts','app/api/evidence/route.ts','app/api/evidence/[id]/route.ts'];
+const files=['lib/domain/form-template.ts','lib/domain/model.ts','lib/domain/admin-model.ts','lib/domain/editor-model.ts','lib/domain/advanced-model.ts','lib/domain/form-export.ts','app/api/results/lifecycle/route.ts','app/api/test-forms/publish/route.ts','lib/domain/navigation-model.ts','lib/server/db.ts','lib/server/errors.ts','lib/server/rows.ts','lib/server/results.ts','lib/server/auth.ts','app/api/results/route.ts','app/api/users/route.ts','app/api/forms/route.ts','app/api/test-forms/route.ts','app/api/test-data/route.ts','app/api/evidence/route.ts','app/api/evidence/[id]/route.ts'];
 try{
  for(const file of files){let source=readFileSync(file,'utf8');if(file==='lib/domain/model.ts')source=source.replace("import raw from './data/plan.json';",'const raw='+readFileSync('lib/domain/data/plan.json','utf8')+';');source=source.replace(/import\s*\{\s*env\s*\}\s*from\s*['"]cloudflare:workers['"];?/g,'const env=globalThis.__onyxTestEnv;').replaceAll('__ONYX_LOCAL_PREVIEW__','false');let js=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText;js=js.replace(/from (['"])(\.[^'"]+)\1/g,(_all,q,name)=>'from '+q+name+'.mjs'+q);const target=path.join(root,file.replace(/\.ts$/,'.mjs'));mkdirSync(path.dirname(target),{recursive:true});writeFileSync(target,js);}
  const sql=new DatabaseSync(':memory:');sql.exec(readFileSync('drizzle/0000_pale_solo.sql','utf8'));
@@ -77,6 +77,40 @@ try{
  await expect(await send(testForms,'test-forms',version2,viewer),403);
  const priorConsole=console.error;sql.exec("CREATE TRIGGER fail_history BEFORE INSERT ON test_form_versions BEGIN SELECT RAISE(ABORT, 'audit failure'); END;");console.error=()=>{};try{await expect(await send(testForms,'test-forms',{...version2,fields:version2.fields.map(f=>({...f,label:f.label+'!'}))}),503);}finally{console.error=priorConsole;sql.exec('DROP TRIGGER fail_history');}
  assert.equal((await get(fresh.id)).version,version2.version,'partial transaction committed');
+ const {instantiateTemplate}=await load('lib/domain/form-template.ts');
+ const templateTarget=editor.resolveTestForm(other.id);
+ const prepSource={...number,id:crypto.randomUUID(),label:'مصدر التهيئة'};
+ const bound={...numeric,id:crypto.randomUUID(),label:'قيمة من التهيئة',preparationSource:prepSource.id};
+ const dependent={...calc,id:crypto.randomUUID(),formula:'['+bound.id+'] * 2',condition:{fieldId:bound.id,operator:'filled',value:'',action:'show'}};
+ const template={schemaVersion:1,fields:[...original.fields,prepSource,bound,dependent]};
+ const unchanged=JSON.stringify({template,templateTarget});
+ const instance=instantiateTemplate(template,templateTarget);
+ const copyOf=id=>instance.fields[template.fields.findIndex(f=>f.id===id)];
+ assert.notEqual(copyOf(prepSource.id).id,prepSource.id);
+ assert.equal(copyOf(bound.id).preparationSource,copyOf(prepSource.id).id);
+ assert.equal(copyOf(dependent.id).formula,'['+copyOf(bound.id).id+'] * 2');
+ assert.equal(copyOf(dependent.id).condition.fieldId,copyOf(bound.id).id);
+ assert.equal(instance.testId,other.id);assert.equal(instance.screenId,templateTarget.screenId);
+ assert.equal(instance.fields.find(f=>f.id==='instructions.reference').defaultValue,templateTarget.fields.find(f=>f.id==='instructions.reference').defaultValue);
+ assert.equal(JSON.stringify({template,templateTarget}),unchanged,'template import mutated its inputs');
+ const repeated=instantiateTemplate(template,templateTarget);
+ assert(repeated.fields.filter(f=>f.kind==='custom').every(f=>!instance.fields.some(old=>old.id===f.id)));
+ for(const invalid of [null,{}, {...template,schemaVersion:2},{...template,fields:[...template.fields,prepSource]},
+  {...template,fields:[...original.fields,{...prepSource,id:'bad-id'}]},{...template,fields:[null]}]){
+  assert.throws(()=>instantiateTemplate(invalid,templateTarget),/[\u0600-\u06ff]/);
+ }
+ const importedData=editor.initialData(other.id,instance);importedData.customValues[copyOf(prepSource.id).id]='0';
+ const importedResult=editor.initialResult(other,initial.user,instance,importedData);
+ assert.equal(importedResult.customValues[copyOf(bound.id).id],'0');
+ assert.equal(editor.validateConfiguredResult(importedResult,instance).customValues[copyOf(dependent.id).id],'0.00');
+ for(const value of [false,'']){
+  const type=typeof value==='boolean'?'boolean':'text';
+  const payload={schemaVersion:1,fields:[...original.fields,{...prepSource,type,defaultValue:value},{...bound,type,defaultValue:value}]};
+  const copied=instantiateTemplate(payload,templateTarget),prep=copied.fields.find(f=>f.label===prepSource.label),exec=copied.fields.find(f=>f.label===bound.label);
+  assert.equal(editor.initialResult(other,initial.user,copied,editor.initialData(other.id,copied)).customValues[exec.id],value);
+  assert.equal(exec.preparationSource,prep.id);
+ }
+ console.log('PASS: independent JSON template imports remap preparation, condition and formula references; retain destination identity/reference; reject malformed sources; repeated imports and zero/false/empty bindings.');
  const navigation=await load('lib/domain/navigation-model.ts');assert.deepEqual(navigation.readWorkspaceLocation(navigation.writeWorkspaceLocation({view:'builder',testId:fresh.id,execute:true}),[fresh.id]),{view:'builder',testId:fresh.id,execute:true});
  assert.equal(editor.hydrateData(fresh.id,draft,preparedSaved).customValues[bool.id],false);assert.equal(editor.hydrateData(fresh.id,draft,preparedSaved).customValues[number.id],'0');
  assert.equal(sql.prepare('SELECT actual FROM results WHERE id=?').get(first.id).actual,'legacy result');assert(sql.prepare('SELECT form_snapshot FROM results WHERE id=?').get(first.id).form_snapshot);
