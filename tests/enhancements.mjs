@@ -89,5 +89,41 @@ try{
  await expect(await lifecycle.POST(request('results/lifecycle','POST',{testId:fresh.id,version:approval.version,action:'new'})),409);assert.equal((await expect(await lifecycle.GET(request('results/lifecycle?testId='+fresh.id)),200)).history.length,1);
  const exports=await load('lib/domain/form-export.ts');for(const format of ['docx','xlsx'])writeFileSync('/tmp/onyx-export-test.'+format,exports.createFormExport(draft,'execution',editor.resultValues(failure,failure.tester),format));
  console.log('PASS: approved results immutable; new runs archive prior definitions and answers; conflicts do not duplicate history; DOCX/XLSX generated with dynamic values.');
+ // Table values must obey their column definitions in both execution and preparation.
+ const tableTest=source.tests.find(t=>![first.id,fresh.id,other.id].includes(t.id));
+ const table={...field,id:crypto.randomUUID(),type:'table',label:'تفاصيل الوثيقة',required:true,defaultValue:'',columns:[
+  {id:'amount',label:'المبلغ',type:'number',required:true,width:120},
+  {id:'date',label:'التاريخ',type:'date',required:true,width:120},
+  {id:'confirmed',label:'تم التحقق',type:'boolean',required:true,width:120},
+  {id:'code',label:'المرجع',type:'text',required:false,width:120},
+ ]};
+ const prepTable={...table,id:crypto.randomUUID(),group:'preparation'};
+ const tableBase=await get(tableTest.id);
+ const tableForm=(await expect(await send(testForms,'test-forms',{...tableBase,fields:[...tableBase.fields,table,prepTable]}),200)).form;
+ await publish(tableForm);
+ const tableResult={...blank,id:tableTest.id,status:'passed',actual:'تم التحقق',customValues:{}};
+ const validRows=[{id:'row-1',cells:{amount:'0',date:'2024-02-29',confirmed:false,code:''}}];
+ const invalidTables=[[],[null],[{id:'row-1',cells:[]}],
+  [{id:'',cells:validRows[0].cells}], [...validRows,...validRows],
+  ...[{amount:false},{amount:' '},{amount:'Infinity'},{date:'2025-02-29'},
+      {date:'2026-13-01'},{confirmed:'false'},{code:false},{amount:''}]
+   .map(cells=>[{id:'row-1',cells:{...validRows[0].cells,...cells}}])];
+ for(const rows of invalidTables){
+  const values=JSON.stringify(rows);
+  const resultError=await expect(await send(results,'results',{...tableResult,customValues:{[table.id]:values}}),400);
+  assert.match(resultError.error,/[\u0600-\u06ff]/,'validation errors must be localized');
+  await expect(await send(data,'test-data',{...prepared,testId:tableTest.id,customValues:{[prepTable.id]:values}}),400);
+ }
+ assert.equal(sql.prepare('SELECT COUNT(*) AS n FROM results WHERE id=?').get(tableTest.id).n,0);
+ assert.equal(sql.prepare('SELECT COUNT(*) AS n FROM test_data WHERE test_id=?').get(tableTest.id).n,0);
+ const savedTable=(await expect(await send(results,'results',{...tableResult,customValues:{[table.id]:JSON.stringify(validRows)}}),200)).result;
+ assert.deepEqual(JSON.parse(savedTable.customValues[table.id]),validRows);
+ const draftData=(await expect(await send(data,'test-data',{...prepared,testId:tableTest.id,ready:false,customValues:{[prepTable.id]:'[]'}}),200)).testData;
+ const readyData=(await expect(await send(data,'test-data',{...draftData,ready:true,customValues:{[prepTable.id]:JSON.stringify(validRows)}}),200)).testData;
+ assert.deepEqual(JSON.parse(readyData.customValues[prepTable.id]),validRows);
+ await expect(await send(results,'results',{...savedTable,customValues:{[table.id]:'[]'}}),400);
+ assert.equal(sql.prepare('SELECT version FROM results WHERE id=?').get(tableTest.id).version,savedTable.version);
+ for(const format of ['docx','xlsx'])assert(exports.createFormExport(tableForm,'execution',editor.resultValues(savedTable,savedTable.tester),format).length>0);
+ console.log('PASS: required tables, localized malformed-row rejection, typed cells, leap dates, zero/false/empty roundtrip, draft-to-ready validation, rejected saves preserve versions, table reports.');
  sql.close();
 }finally{rmSync(root,{recursive:true,force:true});delete globalThis.__onyxTestEnv;}
