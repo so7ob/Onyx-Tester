@@ -45,7 +45,7 @@ try{
  const published=async id=>(await expect(await testForms.GET(request('test-forms?mode=published&testId='+id)),200)).form;
  const publish=async f=>expect(await publication.POST(request('test-forms/publish','POST',{testId:f.testId,version:f.version})),200);
  const original=await get(fresh.id);
- // Editor creation/duplication must survive the same validation as saved forms.
+ { // Editor creation/duplication must survive the same validation as saved forms.
  const created=['boolean','consent','table'].map(type=>editor.createCustomField('execution',type,()=>crypto.randomUUID()));
  assert.equal(created[0].defaultValue,false);assert.equal(created[1].defaultValue,false);assert.equal(created[2].columns.length,2);
  const consent={...created[1],label:'موافقة',defaultValue:true};
@@ -61,6 +61,7 @@ try{
  const editorSaved=(await expect(await send(testForms,'test-forms',{...editorForm,fields:[...editorForm.fields,created[0],consent,table,...copies]}),200)).form;
  const editorReloaded=await get(editorTest.id);assert.deepEqual(editorReloaded.fields,editorSaved.fields);
  assert.equal(editorReloaded.fields.find(f=>f.id===copies[0].id).defaultValue,true);assert.deepEqual(editorReloaded.fields.find(f=>f.id===copies[1].id).columns,table.columns);
+ }
  const field={id:crypto.randomUUID(),kind:'custom',label:'رقم وثيقة إضافي',type:'code',group:'execution',help:'',placeholder:'',required:false,wide:false,active:true,options:[],defaultValue:'NEW-DEFAULT',min:'',max:'',layout:{desktop:4,tablet:6,mobile:12,rows:3,height:70,gap:4},appearance:{color:'#112233',background:'#ffffff',fontSize:18,radius:9}};
  const bool={...field,id:crypto.randomUUID(),type:'boolean',label:'خيار',defaultValue:true,group:'preparation'},number={...field,id:crypto.randomUUID(),type:'number',label:'رقم',defaultValue:'8',group:'preparation'};
  const conditional={...field,id:crypto.randomUUID(),label:'تفاصيل الفشل',type:'textarea',defaultValue:'',required:true,condition:{fieldId:'execution.status',operator:'eq',value:'failed',action:'show'}};

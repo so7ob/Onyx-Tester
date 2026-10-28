@@ -31,3 +31,6 @@ Stacked on #15 to avoid conflicting with its client migration; retarget develop
 only after predecessors integrate. No production writes, migrations or permission
 changes. Merge remains pending independent review and positive branch-retention
 setting evidence. No claim of remote CI acceptance is made by local checks.
+
+Local integration with #11 exposed a duplicate test-fixture variable name; the
+new fixture now has block scope so both regression suites coexist unchanged.
