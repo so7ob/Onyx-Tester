@@ -45,7 +45,37 @@ export function validateAdvancedValue(f:AdvancedField,value:FieldValue,required:
  if(f.type==='time'&&!/^\d{2}:\d{2}(?::\d{2})?$/.test(s))throw new Error('الوقت غير صحيح.');if(f.type==='datetime'&&!Number.isFinite(Date.parse(s)))throw new Error('التاريخ والوقت غير صحيحين.');
  if(f.type==='multiselect'){let a;try{a=JSON.parse(s);}catch{}if(!Array.isArray(a)||a.some(x=>!f.options.includes(x)))throw new Error('الاختيارات المتعددة غير صحيحة.');if(required&&f.required&&!a.length)throw new Error('اختر قيمة في «'+f.label+'».');}
  if(['radio','searchselect'].includes(f.type)&&!f.options.includes(s))throw new Error('اختر قيمة صحيحة في «'+f.label+'».');
- if(f.type==='table'){let a;try{a=JSON.parse(s);}catch{}if(!Array.isArray(a)||a.length>200||new Set(a.map(r=>r.id)).size!==a.length)throw new Error('صفوف الجدول غير صحيحة.');for(const r of a){if(!r||typeof r.id!=='string'||!r.cells||typeof r.cells!=='object')throw new Error('صف الجدول غير صحيح.');for(const c of f.columns??[]){const v=r.cells[c.id];if(required&&c.required&&(v===undefined||v===''))throw new Error('أكمل العمود «'+c.label+'».');if(v!==undefined&&typeof v!=='string'&&typeof v!=='boolean')throw new Error('قيمة الخلية غير صحيحة.');if(c.type==='number'&&v!==undefined&&v!==''&&!Number.isFinite(Number(v)))throw new Error('رقم الخلية غير صحيح.');}}}
+ if(f.type==='table')validateTable(f,s,required);
+}
+
+function validateTable(f:AdvancedField,value:string,required:boolean){
+ let rows:unknown;
+ try{rows=JSON.parse(value);}catch{throw new Error('صفوف الجدول غير صحيحة.');}
+ if(!Array.isArray(rows)||rows.length>200)throw new Error('صفوف الجدول غير صحيحة.');
+ if(required&&f.required&&!rows.length)throw new Error('أضف صفاً في «'+f.label+'».');
+ const ids=new Set<string>();
+ for(const row of rows){
+  if(!row||typeof row!=='object'||Array.isArray(row)||typeof row.id!=='string'||!row.id.trim()||ids.has(row.id))throw new Error('معرفات صفوف الجدول غير صحيحة أو مكررة.');
+  ids.add(row.id);
+  if(!row.cells||typeof row.cells!=='object'||Array.isArray(row.cells))throw new Error('خلايا صف الجدول غير صحيحة.');
+  for(const column of f.columns??[]){
+   const cell:unknown=row.cells[column.id];
+   if(cell===undefined||cell===''){
+    if(required&&column.required)throw new Error('أكمل العمود «'+column.label+'».');
+    continue;
+   }
+   if(column.type==='boolean'){
+    if(typeof cell!=='boolean')throw new Error('قيمة مربع الاختيار في «'+column.label+'» غير صحيحة.');
+    continue;
+   }
+   if(typeof cell!=='string')throw new Error('قيمة الخلية في «'+column.label+'» غير صحيحة.');
+   if(column.type==='number'&&(!cell.trim()||!Number.isFinite(Number(cell))))throw new Error('رقم الخلية في «'+column.label+'» غير صحيح.');
+   if(column.type==='date'){
+    const date=new Date(cell+'T00:00:00Z');
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(cell)||!Number.isFinite(date.getTime())||date.toISOString().slice(0,10)!==cell)throw new Error('تاريخ الخلية في «'+column.label+'» غير صحيح.');
+   }
+  }
+ }
 }
 
 export function protectValues(form:TestForm,group:'execution'|'preparation',values:Values,previous:Values){for(const f of form.fields.filter(f=>f.group===group&&(f.readOnly||f.disabled)&&!['calculated','user','file'].includes(f.type))){const expected=Object.hasOwn(previous,f.id)?previous[f.id]:f.defaultValue;if(Object.hasOwn(values,f.id)&&values[f.id]!==expected)throw new Error('الحقل «'+f.label+'» محمي من التعديل.');}}
