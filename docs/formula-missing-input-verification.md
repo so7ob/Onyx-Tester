@@ -22,3 +22,13 @@ GitHub issue creation was rejected by automatic approval review as an unauthoriz
 external issue publication. No issue was created or retried. Implementation and
 verification continue under the existing development authorization; no issue
 number is assumed. Merge remains blocked on branch-retention evidence and review.
+
+## Differential regression review
+
+A 120-case comparison of complete inputs against the pre-fix parser found no
+behavior differences. Edge cases did expose a regression: a missing operand could
+hide a nonfinite literal or intermediate overflow. Known numeric literals and
+intermediate results now undergo finite-number checks before propagation of the
+missing marker. Tests reject this in evaluation and form-definition validation,
+including overflow on either side of a missing reference; rejected form saves do
+not advance the revision. The regression failed before this correction.

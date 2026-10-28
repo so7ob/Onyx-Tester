@@ -83,6 +83,12 @@ try{
  const failure=(await expect(await send(results,'results',{...recorded,status:'failed',actual:'فشل',customValues:{...recorded.customValues,[conditional.id]:'وصف العطل'}}),200)).result;assert.equal(failure.documentNumber,'0007-A');
  { // Missing operands are not numeric zero, including inside a divisor subtree.
  const calculate=advanced.calculate;
+ const huge='9'.repeat(309),large='9'.repeat(200);
+ for(const expression of [huge+' + [missing]','('+large+' * '+large+') + [missing]','[missing] + ('+large+' * '+large+')','[missing] + ('+large+' * '+large+') / '+large]){
+  assert.throws(()=>calculate(expression,{}),/تجاوزت الحدود/);
+  assert.throws(()=>calculate(expression,{},true),/تجاوزت الحدود/);
+ }
+
  for(const expression of ['10 / [missing]','10 / ([missing] + 2)','10 / -[missing]','[missing] * 0','([missing] + 1) / 2'])assert.equal(calculate(expression,{}),'');
  assert.equal(calculate('10 / [divisor]',{divisor:''}),'');
  assert.equal(calculate('10 / ([divisor] + 2)',{divisor:'3'}),'2');
@@ -96,6 +102,8 @@ try{
   const test=source.tests.at(-3-index),base=await get(test.id);
   const divisor={...field,id:crypto.randomUUID(),type:'number',label:'المقام',group,defaultValue:''};
   const ratio={...divisor,id:crypto.randomUUID(),type:'calculated',label:'النسبة',formula:'10 / ['+divisor.id+']',precision:2};
+  const overflow={...ratio,formula:'9'.repeat(309)+' + ['+divisor.id+']'};
+  await expect(await send(testForms,'test-forms',{...base,fields:[...base.fields,divisor,overflow]}),400);assert.equal((await get(test.id)).version,base.version);
   const saved=(await expect(await send(testForms,'test-forms',{...base,fields:[...base.fields,divisor,ratio]}),200)).form;await publish(saved);
   const route=group==='execution'?results:data,endpoint=group==='execution'?'results':'test-data',key=group==='execution'?'result':'testData';
   const input=group==='execution'?{...blank,id:test.id,customValues:{}}:{...model.emptyTestData(test.id),customValues:{}};
