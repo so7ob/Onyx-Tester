@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {readFileSync,readdirSync,existsSync} from 'node:fs';
+import path from 'node:path';
 const hosting=JSON.parse(readFileSync('.openai/hosting.json','utf8'));
 assert.equal(hosting.project_id,'appgprj_6abd87c86b04819183fa71a0a95de282');
 assert.equal(hosting.d1,'DB'); assert.equal(hosting.r2,'BUCKET');
@@ -23,6 +24,24 @@ const planData=readFileSync('lib/domain/model.ts','utf8');
 assert.ok(!/from ['"]react['"]/.test(planData), 'lib/domain must not import react');
 assert.ok(!/cloudflare:workers/.test(planData), 'lib/domain must not import cloudflare:workers');
 assert.ok(auth.includes('/domain/'), 'lib/server/auth.ts must import domain types from lib/domain');
+// Complete ADR 0003's client boundary. Check all application modules, including
+// new files, rather than just a single example entry point.
+for(const name of ['advanced-properties','apply-form-defaults','configured-fields','form-builder','form-fields','result-editor','test-preparation','user-manager','workspace']){
+ assert.ok(existsSync('components/app/'+name+'.tsx'), 'application component missing: '+name);
+ assert.ok(!existsSync('app/'+name+'.tsx'), 'non-route UI left in app/: '+name);
+}
+const appEntries=readdirSync('app',{withFileTypes:true}).filter(f=>f.isFile()).map(f=>f.name).sort();
+assert.deepEqual(appEntries,['chatgpt-auth.ts','globals.css','layout.tsx','page.tsx']);
+assert.ok(readFileSync('app/page.tsx','utf8').includes('../components/app/workspace'));
+for(const entry of readdirSync('components/app').filter(f=>/\.tsx?$/.test(f))){
+ const file='components/app/'+entry,source=readFileSync(file,'utf8');
+ assert.match(source,/^["']use client["'];/,file+' must declare its client boundary');
+ for(const match of source.matchAll(/(?:from\s*|import\s*\(\s*|import\s*)['"]([^'"]+)['"]/g)){
+  const specifier=match[1];
+  const target=specifier.startsWith('@/')?specifier.slice(2):specifier.startsWith('.')?path.posix.normalize(path.posix.join(path.posix.dirname(file),specifier)):specifier;
+  assert.ok(!/^(?:app\/|lib\/server(?:\/|$)|db(?:\/|$)|cloudflare:|node:|next\/headers)/.test(target),file+' imports server-only module '+specifier);
+ }
+}
 const workflow=readFileSync('.github/workflows/verify.yml','utf8'); for(const s of ['pnpm test','pnpm run lint','pnpm run typecheck','pnpm run build']) assert.ok(workflow.includes(s));
 assert.ok(!workflow.includes('deploy'));
 // Methodology and architecture documentation are present and binding.
