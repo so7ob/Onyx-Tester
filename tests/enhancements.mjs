@@ -88,6 +88,46 @@ try{
  const histories=(await expect(await lifecycle.GET(request('results/lifecycle?testId='+fresh.id)),200)).history;assert.equal(histories.length,1);assert.equal(histories[0].snapshot.actual,'فشل');assert.equal(histories[0].snapshot.formSnapshot.version,draft.version);
  await expect(await lifecycle.POST(request('results/lifecycle','POST',{testId:fresh.id,version:approval.version,action:'new'})),409);assert.equal((await expect(await lifecycle.GET(request('results/lifecycle?testId='+fresh.id)),200)).history.length,1);
  const exports=await load('lib/domain/form-export.ts');for(const format of ['docx','xlsx'])writeFileSync('/tmp/onyx-export-test.'+format,exports.createFormExport(draft,'execution',editor.resultValues(failure,failure.tester),format));
+ // Inspect generated Office parts, not only whether a nonempty ZIP was returned.
+ function officeParts(bytes){
+  const parts={},view=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength),decode=new TextDecoder();let offset=0;
+  while(view.getUint32(offset,true)===0x04034b50){
+   assert.equal(view.getUint16(offset+8,true),0,'fixture reader expects stored ZIP entries');
+   const size=view.getUint32(offset+18,true),nameSize=view.getUint16(offset+26,true),extraSize=view.getUint16(offset+28,true);
+   const name=decode.decode(bytes.subarray(offset+30,offset+30+nameSize)),start=offset+30+nameSize+extraSize;
+   parts[name]=decode.decode(bytes.subarray(start,start+size));offset=start+size;
+  }
+  return parts;
+ }
+ const officeForm={...draft,fields:[...draft.fields,
+  {...field,id:crypto.randomUUID(),label:'قيمة صفرية',defaultValue:'0'},
+  {...field,id:crypto.randomUUID(),label:'قيمة منطقية',type:'boolean',defaultValue:false},
+  {...field,id:crypto.randomUUID(),label:'نص يشبه معادلة',defaultValue:'=1+1'},
+ ]};
+ const officeValues={...editor.resultValues(failure,failure.tester),'execution.notes':'مراجعة 0007-A وربط INV-001/2026 <&> "نص"'};
+ const expected=exports.exportedRows(officeForm,'execution',officeValues);
+ const escaped=text=>text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+ const wordBytes=exports.createFormExport(officeForm,'execution',officeValues,'docx'),sheetBytes=exports.createFormExport(officeForm,'execution',officeValues,'xlsx');
+ const word=officeParts(wordBytes)['word/document.xml'],sheetParts=officeParts(sheetBytes),sheet=sheetParts['xl/worksheets/sheet1.xml'];
+ const paragraphs=[...word.matchAll(/<w:p>([\s\S]*?)<\/w:p>/g)].map(m=>[...m[1].matchAll(/<w:t xml:space="preserve">([\s\S]*?)<\/w:t>/g)].map(t=>t[1]).join(''));
+ assert.deepEqual(paragraphs.slice(1),expected.flatMap(r=>[escaped(r.label),escaped(r.value)]),'DOCX must preserve every exported label/value exactly');
+ for(const code of ['0007-A','0001-B','INV-001/2026'])assert([...word.matchAll(/<w:r>([\s\S]*?)<\/w:r>/g)].some(m=>m[1].includes('<w:rtl w:val="0"/>')&&m[1].includes('>'+code+'</w:t>')),'LTR run missing for '+code);
+ assert.equal((word.match(/<w:t>&#x200E;<\/w:t>/g)??[]).length,2*[...word.matchAll(/<w:r>([\s\S]*?)<\/w:r>/g)].filter(m=>m[1].includes('<w:rtl w:val="0"/>')&&m[1].includes('xml:space="preserve"')).length,'LTR data runs need separate directional boundaries');
+ assert(word.includes('<w:bidi/>')&&word.includes('<w:rtl w:val="1"/>'),'Arabic layout must remain RTL');
+ assert.deepEqual([...sheet.matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g)].map(m=>m[1]),['الحقل','القيمة',...expected.flatMap(r=>[escaped(r.label),escaped(r.value)])]);
+ assert(!sheet.includes('<f>'),'user text must not turn into spreadsheet formulas');
+ assert(sheet.includes('fitToPage="1"')&&sheet.includes('fitToWidth="1"')&&sheet.includes('fitToHeight="0"'),'print width must keep label/value columns together without squeezing all rows onto one page');
+ assert(sheet.includes('rightToLeft="1"')&&sheet.includes('r="A1" s="2"')&&sheet.includes('r="A2" s="1"'));
+ assert(sheetParts['xl/styles.xml'].includes('wrapText="1"')&&sheetParts['xl/styles.xml'].includes('readingOrder="0"'));
+ assert(sheetParts['xl/workbook.xml'].includes('_xlnm.Print_Titles'));
+ assert(sheetParts['xl/_rels/workbook.xml.rels'].includes('Target="styles.xml"'));
+ assert(sheetParts['[Content_Types].xml'].includes('PartName="/xl/styles.xml"'));
+ writeFileSync('/tmp/onyx-office-qa.docx',wordBytes);writeFileSync('/tmp/onyx-office-qa.xlsx',sheetBytes);
+ const longForm={...officeForm,fields:[...officeForm.fields,...Array.from({length:35},(_,i)=>({...field,id:crypto.randomUUID(),label:'تفاصيل إضافية '+(i+1),defaultValue:('تحقق من الوثيقة 0007-A والقيمة المرتبطة مع الحفاظ على البيانات السابقة. ').repeat(3)}))]};
+ const longBytes=exports.createFormExport(longForm,'execution',officeValues,'xlsx');
+ assert.equal((officeParts(longBytes)['xl/worksheets/sheet1.xml'].match(/<row /g)??[]).length,exports.exportedRows(longForm,'execution',officeValues).length+1);
+ writeFileSync('/tmp/onyx-office-long.xlsx',longBytes);
+ console.log('PASS: Office parts preserve all labels/values, mixed RTL/LTR codes, zero/false/empty values and formula-like text; XLSX wraps, repeats headers and fits one page wide.');
  console.log('PASS: approved results immutable; new runs archive prior definitions and answers; conflicts do not duplicate history; DOCX/XLSX generated with dynamic values.');
  sql.close();
 }finally{rmSync(root,{recursive:true,force:true});delete globalThis.__onyxTestEnv;}
