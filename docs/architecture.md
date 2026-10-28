@@ -13,39 +13,38 @@ published form separation, result↔form-version binding, server-enforced tester
 identity and permissions, evidence integrity, Arabic RTL + Tajawal, zero/`false`/
 empty preservation — is a hard constraint. Refactoring must preserve all of it.
 
-## Current structure (develop after the lint-blocker fix)
+## Current structure (after the domain, server and client extraction stack)
 
 ```
-app/                Next.js/vinext app router — the ONLY place routes may live.
-  layout.tsx, page.tsx, globals.css   framework-required entry points.
-  api/               API route handlers (route.ts) + shared server helpers.
-    auth.ts, storage.ts, types.ts    auth, D1/R2 access, typed row interfaces.
-    results/, results/lifecycle/, forms/, test-data/, test-forms/, users/,
-    evidence/, evidence/[id]/, test-forms/publish/   route handlers.
-  *-model.ts         domain models (model, admin-model, editor-model,
-                     advanced-model, navigation-model). [target: move to lib/domain]
-  *.tsx              client UI components (form-builder, result-editor,
-                     test-preparation, user-manager, workspace, configured-fields,
-                     apply-form-defaults, advanced-properties, form-fields).
-                     [target: move non-route UI to components/app/]
-  form-export.ts, chatgpt-auth.ts   pure export logic / server-only auth helper.
+app/                Next.js/vinext framework entries and API routes.
+  layout.tsx, page.tsx, globals.css
+  chatgpt-auth.ts    dispatch-owned server-only authentication helper.
+  api/**/route.ts    API handlers; import shared server/domain modules.
 components/
-  ui/                shadcn registry components, vendored verbatim (do not edit).
-  connector-error.tsx   Sites connector surface error UI.
-lib/                 Sites connector integration (contract, errors, preview, utils).
-db/                  Drizzle schema (schema.ts) and D1 client (index.ts).
-drizzle/             checked-in SQL migrations (0000–0005) + meta.
-build/               Sites Vite plugin + workers (build-time, not application code).
-scripts/             framework runner, install, env, execution profile.
-tests/               node-based behavioral + architecture-contract suites.
-docs/                guides, worklog, this file, ADRs.
-.github/             verify.yml workflow + issue/PR templates.
+  app/              client application UI: workspace, form-builder,
+                    configured-fields, form-fields, advanced-properties,
+                    apply-form-defaults, result-editor, test-preparation,
+                    user-manager.
+  ui/               shadcn registry components, vendored verbatim.
+  connector-error.tsx  Sites connector surface error UI.
+lib/
+  domain/           pure models, navigation, templates and form exports;
+                    data/plan.json preserves source test/screen identities.
+  server/           db, errors, auth, rows and results helpers.
+  *.ts, *.mts       Sites connector integration and shared utilities.
+db/, drizzle/       schema, D1 client and checked-in migrations 0000–0005.
+build/              Sites Vite plugin + workers (build-time integration).
+scripts/            framework runner, install, env and execution profile.
+tests/              behavioral + architecture-contract suites.
+docs/, .github/     guides, ADRs, worklog, CI and contribution templates.
 ```
 
-The known debt: `app/` mixes framework routes, domain models, and UI components.
-The lint-blocker fix (PR #5) already added typed D1 rows and removed `any`; the
-follow-up refactor extracts domain models and pure logic out of `app/` so that
-`app/` contains only routes that delegate to organized modules.
+PR #5 repairs lint; #7 extracts domain; #9 extracts shared server helpers.
+The client follow-up completes ADR 0003's non-route UI move. `app/page.tsx`
+delegates to `components/app/workspace.tsx`; the nine client modules retain
+all component code and state behavior, changing only their import paths.
+API handlers still contain some SQL orchestration; further service extraction
+and clearer domain filenames remain scoped follow-ups, not completed work.
 
 ## Target structure (after the refactor PR)
 
@@ -62,7 +61,7 @@ lib/
   shared/                       small, organized, cross-cutting types & helpers.
   client/                       client-only helpers (fetch wrappers, ids).
 components/
-  app/                          application UI (imports domain types only).
+  app/                          application UI (imports pure domain functions and types).
   ui/                           shadcn vendored (unchanged).
 db/, drizzle/, build/, scripts/, tests/, docs/, .github/   unchanged.
 ```
@@ -86,7 +85,7 @@ Rules:
 3. `lib/client` imports `lib/domain` (types only) and `lib/shared`. It owns
    fetch wrappers and client ids; it never imports server-only code
    (`cloudflare:workers`, `lib/server`, `app/chatgpt-auth`).
-4. `components/app` imports `lib/domain` (types) and `lib/client`; never imports
+4. `components/app` imports pure `lib/domain` functions/types and `lib/client`; never imports
    `lib/server` or `app/api` server internals.
 5. `app/api/*/route.ts` imports `lib/server` + `lib/domain`; it validates input,
    authorizes, calls a service, and returns JSON. It must not contain domain
@@ -99,13 +98,13 @@ Rules:
 ## Client vs server boundary
 
 Server-only modules (must never be imported by client code):
-- `app/api/**` (route handlers and `auth.ts`, `storage.ts`, `types.ts`).
+- `app/api/**` (route handlers).
 - `app/chatgpt-auth.ts` (dispatch-owned; server-only per README).
 - `lib/server/**`.
 - `db/index.ts` (reads the D1 binding from the Workers env).
 
 Client modules (`"use client"`) may import: React, `components/ui`,
-`components/app`, `lib/client`, `lib/domain` (types only via `import type`), and
+`components/app`, `lib/client`, pure `lib/domain` functions (types via `import type`), and
 each other. The architecture-contract test guards against server modules leaking
 into client bundles.
 
