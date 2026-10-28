@@ -81,6 +81,42 @@ try{
  await publish(version2);const readback=await expect(await results.GET(request('results')),200);assert(!readback.testForms[fresh.id].fields.some(f=>f.id===field.id));assert(readback.results[fresh.id].formSnapshot.fields.some(f=>f.id===field.id),'historical field lost');assert.equal(readback.results[fresh.id].formSnapshot.fields.find(f=>f.id==='execution.documentNumber').label,'رقم المستند الفعلي');
  await expect(await send(results,'results',{...recorded,status:'failed',actual:'فشل',customValues:{...recorded.customValues,[conditional.id]:''}}),400);
  const failure=(await expect(await send(results,'results',{...recorded,status:'failed',actual:'فشل',customValues:{...recorded.customValues,[conditional.id]:'وصف العطل'}}),200)).result;assert.equal(failure.documentNumber,'0007-A');
+ { // Missing operands are not numeric zero, including inside a divisor subtree.
+ const calculate=advanced.calculate;
+ const huge='9'.repeat(309),large='9'.repeat(200);
+ for(const expression of [huge+' + [missing]','('+large+' * '+large+') + [missing]','[missing] + ('+large+' * '+large+')','[missing] + ('+large+' * '+large+') / '+large]){
+  assert.throws(()=>calculate(expression,{}),/تجاوزت الحدود/);
+  assert.throws(()=>calculate(expression,{},true),/تجاوزت الحدود/);
+ }
+
+ for(const expression of ['10 / [missing]','10 / ([missing] + 2)','10 / -[missing]','[missing] * 0','([missing] + 1) / 2'])assert.equal(calculate(expression,{}),'');
+ assert.equal(calculate('10 / [divisor]',{divisor:''}),'');
+ assert.equal(calculate('10 / ([divisor] + 2)',{divisor:'3'}),'2');
+ assert.equal(calculate('0 / [divisor]',{divisor:'2'}),'0');
+ for(const expression of ['10 / 0','10 / (2 - 2)','10 / [divisor]'])assert.throws(()=>calculate(expression,{divisor:'0'}),/القسمة على صفر/);
+ assert.throws(()=>calculate('[missing] + 1 / 0',{}),/القسمة على صفر/);
+ assert.throws(()=>calculate('[missing] + )',{}));assert.throws(()=>calculate('10 / [divisor]',{divisor:false}));
+ }
+ { // Exercise draft persistence and correction through both server save routes.
+ for(const [index,group] of ['execution','preparation'].entries()){
+  const test=source.tests.at(-3-index),base=await get(test.id);
+  const divisor={...field,id:crypto.randomUUID(),type:'number',label:'المقام',group,defaultValue:''};
+  const ratio={...divisor,id:crypto.randomUUID(),type:'calculated',label:'النسبة',formula:'10 / ['+divisor.id+']',precision:2};
+  const overflow={...ratio,formula:'9'.repeat(309)+' + ['+divisor.id+']'};
+  await expect(await send(testForms,'test-forms',{...base,fields:[...base.fields,divisor,overflow]}),400);assert.equal((await get(test.id)).version,base.version);
+  const saved=(await expect(await send(testForms,'test-forms',{...base,fields:[...base.fields,divisor,ratio]}),200)).form;await publish(saved);
+  const route=group==='execution'?results:data,endpoint=group==='execution'?'results':'test-data',key=group==='execution'?'result':'testData';
+  const input=group==='execution'?{...blank,id:test.id,customValues:{}}:{...model.emptyTestData(test.id),customValues:{}};
+  let draft=(await expect(await send(route,endpoint,input),200))[key];assert.equal(draft.customValues[ratio.id],'');
+  const getSaved=async()=>{const response=await expect(await results.GET(request('results')),200);return group==='execution'?response.results[test.id]:response.testData[test.id];};
+  assert.equal((await getSaved()).customValues[ratio.id],'');
+  const rejected=await expect(await send(route,endpoint,{...draft,customValues:{[divisor.id]:'0',[ratio.id]:'999'}}),400);assert.match(rejected.error,/القسمة على صفر/);assert.equal((await getSaved()).version,draft.version);
+  for(const value of ['2','','5','']){
+   draft=(await expect(await send(route,endpoint,{...draft,customValues:{[divisor.id]:value,[ratio.id]:'999'}}),200))[key];
+   assert.equal(draft.customValues[ratio.id],value===''?'':(10/Number(value)).toFixed(2));
+  }
+ }
+ }
  const numeric={...field,id:crypto.randomUUID(),type:'number',label:'الأساس',defaultValue:'',group:'execution'};const calc={...numeric,id:crypto.randomUUID(),type:'calculated',label:'الضريبة',formula:'['+numeric.id+'] * 0.15',precision:2};
  const otherForm=await get(other.id);const formulaDraft=(await expect(await send(testForms,'test-forms',{...otherForm,fields:[...otherForm.fields,numeric,calc]}),200)).form;await publish(formulaDraft);
  const computed=(await expect(await send(results,'results',{...blank,id:other.id,customValues:{[numeric.id]:'100',[calc.id]:'999999'}}),200)).result;assert.equal(computed.customValues[calc.id],'15.00');
