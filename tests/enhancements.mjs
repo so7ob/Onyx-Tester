@@ -117,6 +117,42 @@ try{
   }
  }
  }
+ { // Numeric thresholds must fail before they can hide a field.
+ const numericCondition={fieldId:'execution.documentNumber',operator:'gt',value:'not-a-number',action:'show'};
+ const target={...field,id:crypto.randomUUID(),condition:numericCondition};
+ for(const value of ['not-a-number','','   ','NaN','Infinity','-Infinity','1e309']){
+  const condition={...numericCondition,value};
+  assert.throws(()=>advanced.validateExtras({...target,condition},new Set([target.id,condition.fieldId])),/عدد/);
+  for(const values of [{},{[condition.fieldId]:''},{[condition.fieldId]:'10'}])assert.throws(()=>advanced.conditionMatches(condition,values),/عدد/);
+  assert.throws(()=>advanced.effectiveField({...target,condition},{}),/عدد/);
+  assert.throws(()=>advanced.effectiveField({...target,active:false,condition},{}),/عدد/);
+ }
+ for(const value of ['0','-0','-2.5',' .5 ','1e2','9'.repeat(300)])assert.doesNotThrow(()=>advanced.validateExtras({...target,condition:{...numericCondition,value}},new Set([target.id,numericCondition.fieldId])));
+ assert.equal(advanced.conditionMatches({...numericCondition,value:'0'},{'execution.documentNumber':'1'}),true);
+ assert.equal(advanced.conditionMatches({...numericCondition,value:'0'},{}),false);
+ assert.equal(advanced.conditionMatches({...numericCondition,value:'0'},{'execution.documentNumber':''}),false);
+ assert.equal(advanced.conditionMatches({...numericCondition,operator:'lt',value:'1'},{'execution.documentNumber':'0'}),true);
+ assert.equal(advanced.conditionMatches({...numericCondition,operator:'eq'},{'execution.documentNumber':'not-a-number'}),true);
+ assert.equal(advanced.conditionMatches({...numericCondition,operator:'ne'},{'execution.documentNumber':'other'}),true);
+ }
+ { // API rejects invalid definitions; legacy invalid conditions cannot hide answers.
+ const test=source.tests.at(-5),base=await get(test.id);
+ const dependent={...field,id:crypto.randomUUID(),defaultValue:'',required:true,condition:{fieldId:'execution.documentNumber',operator:'gt',value:'0',action:'show'}};
+ for(const operator of ['gt','lt'])for(const value of ['bad','','  ','NaN','Infinity','-Infinity','1e309']){
+  const malformed={...base,fields:[...base.fields,{...dependent,condition:{...dependent.condition,operator,value}}]};
+  await expect(await send(testForms,'test-forms',malformed),400);assert.equal((await get(test.id)).version,base.version);
+  assert.throws(()=>editor.validateConfiguredResult({...blank,id:test.id},malformed),/عدد/);
+ }
+ const reportModule=await load('lib/domain/form-export.ts');
+ assert.throws(()=>reportModule.exportedRows({...base,fields:[...base.fields,{...dependent,condition:{...dependent.condition,value:'bad'}}]},'execution',{}),/عدد/);
+ const valid=(await expect(await send(testForms,'test-forms',{...base,fields:[...base.fields,dependent]}),200)).form;await publish(valid);
+ const hidden=(await expect(await send(results,'results',{...blank,id:test.id,status:'passed',actual:'تم',documentNumber:'0',customValues:{[dependent.id]:''}}),200)).result;
+ await expect(await send(results,'results',{...hidden,documentNumber:'1'}),400);
+ assert.equal((await expect(await results.GET(request('results')),200)).results[test.id].version,hidden.version);
+ const visible=(await expect(await send(results,'results',{...hidden,documentNumber:'1',customValues:{[dependent.id]:'تفاصيل'}}),200)).result;assert.equal(visible.customValues[dependent.id],'تفاصيل');
+ const textForm={...valid,fields:valid.fields.map(f=>f.id===dependent.id?{...f,condition:{...dependent.condition,operator:'eq',value:'not-a-number'}}:f)};
+ assert.doesNotThrow(()=>editor.validateTestForm(textForm));
+ }
  const numeric={...field,id:crypto.randomUUID(),type:'number',label:'الأساس',defaultValue:'',group:'execution'};const calc={...numeric,id:crypto.randomUUID(),type:'calculated',label:'الضريبة',formula:'['+numeric.id+'] * 0.15',precision:2};
  const otherForm=await get(other.id);const formulaDraft=(await expect(await send(testForms,'test-forms',{...otherForm,fields:[...otherForm.fields,numeric,calc]}),200)).form;await publish(formulaDraft);
  const computed=(await expect(await send(results,'results',{...blank,id:other.id,customValues:{[numeric.id]:'100',[calc.id]:'999999'}}),200)).result;assert.equal(computed.customValues[calc.id],'15.00');

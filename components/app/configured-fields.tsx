@@ -6,7 +6,7 @@ import {Button} from '@/components/ui/button';
 import {states} from '../../lib/domain/model';
 import type {FieldValue,Values} from '../../lib/domain/admin-model';
 import type {FormField,FormGroup,TestForm} from '../../lib/domain/editor-model';
-import {computedValues,effectiveField} from '../../lib/domain/advanced-model';
+import {computedValues,effectiveField,numericConditionError} from '../../lib/domain/advanced-model';
 import {Choice,Tick,newFieldId} from './form-fields';
 type Row={id:string;cells:Record<string,FieldValue>};
 function EditableTable({field:f,value,onChange,disabled}:{field:FormField;value:FieldValue;onChange:(v:FieldValue)=>void;disabled:boolean}){
@@ -17,7 +17,8 @@ function EditableTable({field:f,value,onChange,disabled}:{field:FormField;value:
 function SearchChoice({f,value,onChange,disabled}:{f:FormField;value:FieldValue;onChange:(v:FieldValue)=>void;disabled:boolean}){const [search,setSearch]=useState('');return <div><Input aria-label={'بحث '+f.label} placeholder="بحث في الخيارات…" value={search} onChange={e=>setSearch(e.target.value)} disabled={disabled}/><Choice label={f.label} value={String(value)||'__empty'} onChange={v=>onChange(v==='__empty'?'':v)} options={[["__empty","اختر قيمة"],...f.options.filter(o=>o.includes(search)||o===value).map(o=>[o,f.optionItems?.find(x=>x.value===o)?.label??o] as [string,string])]} disabled={disabled}/></div>;}
 export function ConfiguredFields({form,group,values:inputValues,onChange,required=false,disabled=false,preview=false,fileContent,onSelect,selected}:{form:TestForm;group:FormGroup;values:Values;onChange:(field:FormField,value:FieldValue)=>void;required?:boolean;disabled?:boolean;preview?:boolean;fileContent?:ReactNode;onSelect?:(id:string)=>void;selected?:string}){
  const computed=computedValues(form,inputValues),values=computed.values;
- const items=form.fields.filter(f=>f.group===group).map(f=>effectiveField(f,values)).filter(f=>f.active);
+ const conditionErrors:string[]=[];
+ const items=form.fields.filter(f=>f.group===group).map(f=>{const error=numericConditionError(f.condition);if(error){conditionErrors.push(f.label+': '+error);return {...f,disabled:true};}return effectiveField(f,values);}).filter(f=>f.active);
  function render(f:FormField){
  const value=Object.hasOwn(values,f.id)?values[f.id]:(f.kind==='custom'||group==='instructions'?f.defaultValue:['boolean','consent'].includes(f.type)?false:'');const id=(preview?'preview-':'input-')+f.id,req=required&&f.required;const locked=disabled||!!f.disabled||!!f.readOnly;
  const l=f.layout,a=f.appearance;const style={'--field-desktop':l?.desktop??(f.wide?12:6),'--field-tablet':l?.tablet??(f.wide?12:6),'--field-mobile':l?.mobile??12,'--field-height':l?.height?l.height+'px':'auto','--field-rows':l?.rows??3,'--field-gap':(l?.gap??0)+'px','--field-font':(a?.fontSize??16)+'px','--field-radius':(a?.radius??6)+'px','--field-background':a?.background??'#ffffff','--field-color':a?.color??'#183e30'} as CSSProperties;
@@ -41,5 +42,5 @@ export function ConfiguredFields({form,group,values:inputValues,onChange,require
  }
  const groups:({name:string;fields:FormField[]}|FormField)[]=[];
  for(const f of items){if(!f.section){groups.push(f);continue;}const last=groups.at(-1);if(last&&'name' in last&&last.name===f.section)last.fields.push(f);else groups.push({name:f.section,fields:[f]});}
- return <div className="configured-fields">{groups.map((item,i)=>'name' in item?<details className="dynamic-section" key={'section-'+i} open><summary>{item.name}</summary><div className="configured-fields">{item.fields.map(render)}</div></details>:render(item))}</div>;
+ return <div className="configured-fields">{conditionErrors.map((error,i)=><p key={i} role="alert" className="form-error" style={{gridColumn:'1 / -1'}}>{error}</p>)}{groups.map((item,i)=>'name' in item?<details className="dynamic-section" key={'section-'+i} open><summary>{item.name}</summary><div className="configured-fields">{item.fields.map(render)}</div></details>:render(item))}</div>;
 }
