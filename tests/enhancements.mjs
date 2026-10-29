@@ -135,6 +135,44 @@ try{
  assert.equal(advanced.conditionMatches({...numericCondition,operator:'eq'},{'execution.documentNumber':'not-a-number'}),true);
  assert.equal(advanced.conditionMatches({...numericCondition,operator:'ne'},{'execution.documentNumber':'other'}),true);
  }
+ { // Numeric comparisons never coerce missing or nonnumeric source values.
+ const condition={fieldId:'source',operator:'lt',value:'1',action:'show'};
+ const invalid=[undefined,null,'',' ','\t\n',true,false,[],[0],['2'],{},'bad','NaN','Infinity','-Infinity','1e309',NaN,Infinity,-Infinity];
+ for(const value of invalid)for(const operator of ['gt','lt']){
+  const c={...condition,operator,value:operator==='gt'?'-1':'1'};
+  assert.equal(advanced.conditionMatches(c,{source:value}),false,operator+' must reject source '+JSON.stringify(value));
+  for(const action of ['show','require','disable']){
+   const effective=advanced.effectiveField({...field,required:false,condition:{...c,action}},{source:value});
+   assert.equal(effective.active,action!=='show');assert.equal(effective.required,false);assert.equal(!!effective.disabled,false);
+  }
+ }
+ for(const value of [0,'0','-0',' 0 ','.5','5e-1',-2,'-2'])assert.equal(advanced.conditionMatches(condition,{source:value}),true);
+ for(const value of [2,'2',' 2 ','2e1'])assert.equal(advanced.conditionMatches({...condition,operator:'gt'},{source:value}),true);
+ assert.equal(advanced.conditionMatches({...condition,operator:'eq',value:'true'},{source:true}),true);
+ assert.equal(advanced.conditionMatches({...condition,operator:'eq',value:' '},{source:' '}),true);
+ assert.equal(advanced.conditionMatches({...condition,operator:'ne',value:'0'},{source:false}),true);
+ assert.equal(advanced.conditionMatches({...condition,operator:'filled'},{source:false}),true);
+ }
+ { // Both save routes preserve missing semantics before custom values are trimmed.
+ for(const [index,group] of ['execution','preparation'].entries()){
+  const test=source.tests.at(-6-index),base=await get(test.id);
+  const sourceField={...field,id:crypto.randomUUID(),type:'text',group,defaultValue:''};
+  const flag={...sourceField,id:crypto.randomUUID(),type:'boolean',defaultValue:false};
+  const dependent={...sourceField,id:crypto.randomUUID(),required:true,condition:{fieldId:sourceField.id,operator:'lt',value:'1',action:'show'}};
+  const flagDependent={...dependent,id:crypto.randomUUID(),condition:{fieldId:flag.id,operator:'gt',value:'-1',action:'show'}};
+  const form=(await expect(await send(testForms,'test-forms',{...base,fields:[...base.fields,sourceField,flag,dependent,flagDependent]}),200)).form;await publish(form);
+  const route=group==='execution'?results:data,endpoint=group==='execution'?'results':'test-data',key=group==='execution'?'result':'testData';
+  let saved=group==='execution'?{...blank,id:test.id,status:'passed',actual:'تم',customValues:{}}:{...model.emptyTestData(test.id),party:'طرف',amount:'0',currency:'YER',ready:true,customValues:{}};
+  for(const value of ['  ','bad','Infinity','-Infinity','1e309','']){
+   saved=(await expect(await send(route,endpoint,{...saved,customValues:{[sourceField.id]:value,[flag.id]:false}}),200))[key];
+  }
+  await expect(await send(route,endpoint,{...saved,customValues:{[sourceField.id]:'0',[flag.id]:true}}),400);
+  const state=await expect(await results.GET(request('results')),200);assert.equal((group==='execution'?state.results[test.id]:state.testData[test.id]).version,saved.version);
+  saved=(await expect(await send(route,endpoint,{...saved,customValues:{[sourceField.id]:'0',[flag.id]:true,[dependent.id]:'إجابة'}}),200))[key];
+  assert.equal(saved.customValues[sourceField.id],'0');assert.equal(saved.customValues[flag.id],true);
+  for(const malformed of [[],[0],{},null])await expect(await send(route,endpoint,{...saved,customValues:{...saved.customValues,[sourceField.id]:malformed}}),400);
+ }
+ }
  { // API rejects invalid definitions; legacy invalid conditions cannot hide answers.
  const test=source.tests.at(-5),base=await get(test.id);
  const dependent={...field,id:crypto.randomUUID(),defaultValue:'',required:true,condition:{fieldId:'execution.documentNumber',operator:'gt',value:'0',action:'show'}};
